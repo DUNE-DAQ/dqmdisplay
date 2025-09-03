@@ -205,6 +205,7 @@ def build_run_trigger_lookup():
     """
     Build a lookup dict of all available objects per run/trigger.
     Scans each directory only once for speed.
+    Returns a dict sorted by run and trigger.
     """
     lookup = {}
 
@@ -224,15 +225,12 @@ def build_run_trigger_lookup():
             ele = int(match.group('ele')) if match.group('ele') else None
             plane = int(match.group('plane'))
 
-            if run not in lookup:
-                lookup[run] = {}
-            if trigger not in lookup[run]:
-                lookup[run][trigger] = {
-                    "event_display": {},
-                    "plane_display": {},
-                    "wib_tests": False,
-                    "pds": False
-                }
+            lookup.setdefault(run, {}).setdefault(trigger, {
+                "event_display": {},
+                "plane_display": {},
+                "wib_tests": False,
+                "pds": False
+            })
 
             if ele is not None:
                 lookup[run][trigger]["event_display"][ele] = True
@@ -272,16 +270,12 @@ def build_run_trigger_lookup():
                 "pds": False
             })["pds"] = True
 
-    # Sort runs and triggers in decreasing order
-    sorted_lookup = {}
-    for run in sorted(lookup.keys(), reverse=True):
-        sorted_lookup[run] = {}
-        for trigger in sorted(lookup[run].keys(), reverse=True):
-            sorted_lookup[run][trigger] = lookup[run][trigger]
-    lookup = sorted_lookup
+    # --- Sort the dict by run and trigger ---
+    sorted_lookup = {run: {trigger: lookup[run][trigger]
+                           for trigger in sorted(lookup[run], reverse=True)}
+                     for run in sorted(lookup, reverse=True)}
 
-    return lookup
-
+    return sorted_lookup
 
 @app.route('/')
 @app.route('/index')
