@@ -1,7 +1,8 @@
 from flask import Flask, send_from_directory, render_template 
 from dqmdisplay.file_operations.pds_plots import get_pds_plots, get_latest_pds_plots
 from dqmdisplay.file_operations.wib_plots import get_WIBTests_files, get_latest_WIBTests_files
-from dqmdisplay.file_operations.event_display_plots import get_EventDisplay_files, get_latest_EventDisplay_files, build_run_trigger_lookup
+from dqmdisplay.file_operations.event_display_plots import get_EventDisplay_files, get_latest_EventDisplay_files
+from dqmdisplay.file_operations.gather_files import build_run_trigger_lookup
 
 app = Flask(__name__)
 

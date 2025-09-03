@@ -14,4 +14,4 @@ dependencies = [
 ]
 
 [project.scripts]
-dqm_display="dqm_display.apps.__main__dqm_display__.py:main"
+dqm_display="dqmdisplay.apps.__main__dqm_display__:main"
