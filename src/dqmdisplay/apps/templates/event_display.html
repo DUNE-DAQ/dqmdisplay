@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid-container">
+
+  <div class="row">
+    <div class="col-md-12">
+      {% if run and trigger %}
+        {% if plane %}
+          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ ele }} Plane {{ plane }}</h1>
+        {% else %}
+          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ ele }}</h1>
+        {% endif %}
+      {% else %}
+        {% if plane %}
+          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ ele }} Plane {{ plane }}</h1>
+        {% else %}
+          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ ele }}</h1>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% for image in images %}
+  <div class="row">
+    <div class="image-container">
+      <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=image) }}" alt="{{ image }}"/>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid-container">
+
+  <div class="row">
+    <div class="col-md-12">
+      {% if run and trigger %}
+        <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ ele }} GRID</h1>
+      {% else %}
+        <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ ele }} GRID</h1>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    {% for image in images %}
+    <div class="col-md-4" style="padding-left: 0; padding-right: 0">
+      <div class="grid-image-container">
+        <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=image) }}" alt="{{ image }}"/>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

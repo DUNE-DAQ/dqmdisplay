@@ -1,0 +1,17 @@
+[project]
+name = "dqmdisplay"
+version = "1.0.0"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flask",
+    "kaleido",
+    "numpy",
+    "pandas",
+    "plotly",
+    "tables",
+    "tabulate",
+]
+
+[project.scripts]
+dqm_display="dqmdisplay.apps.__main__dqm_display__:main"

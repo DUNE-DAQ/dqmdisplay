@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Plot Navigator{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Plot Navigator</h1>
+
+    {% macro link_item(url, icon, label) %}
+    <li><a href="{{ url }}" class="text-decoration-none"><i class="fas {{ icon }}"></i> {{ label }}</a></li>
+    {% endmacro %}
+
+    {% macro trigger_section(run, trigger, availability) %}
+    <div class="row">
+        <!-- Event Displays -->
+        <div class="col-md-4">
+            <h6 class="text-primary">Event Displays</h6>
+            <ul class="list-unstyled ml-3">
+                {% for ele_no in [1,2,3,4,5] %}
+                    {% if availability.event_display[ele_no] %}
+                        {{ link_item(url_for('run_trigger_event_display', run=run, trigger=trigger, ele=ele_no), 'fa-chart-line', 'APA/CRP ' ~ ele_no ~ ' Display') }}
+                        {{ link_item(url_for('run_trigger_event_display_grid', run=run, trigger=trigger, ele=ele_no), 'fa-th', 'APA/CRP ' ~ ele_no ~ ' Grid') }}
+                    {% endif %}
+                {% endfor %}
+                {% for plane_no in [0,1,2] %}
+                    {% if availability.plane_display[plane_no] %}
+                        {{ link_item(url_for('run_trigger_event_display_plane', run=run, trigger=trigger, plane=plane_no), 'fa-layer-group', 'Plane ' ~ plane_no ~ ' Grid') }}
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Test Results -->
+        <div class="col-md-4">
+            <h6 class="text-success">Test Results</h6>
+            <ul class="list-unstyled ml-3">
+                {% if availability.wib_tests %}
+                    {{ link_item(url_for('run_trigger_tests_wibs', run=run, trigger=trigger), 'fa-vial', 'TPC WIB Test Results') }}
+                {% endif %}
+            </ul>
+        </div>
+
+        <!-- PDS Plots -->
+        <div class="col-md-4">
+            <h6 class="text-warning">PDS Plots</h6>
+            <ul class="list-unstyled ml-3">
+                {% if availability.pds %}
+                    {{ link_item(url_for('run_trigger_pds', run=run, trigger=trigger), 'fa-chart-area', 'PDS Plots') }}
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+    {% endmacro %}
+
+    {% macro trigger_card(run, trigger, availability) %}
+    <div class="card trigger-card mb-3">
+        <div class="card-header" id="triggerHeading{{ run }}{{ trigger }}">
+            <h5 class="mb-0">
+                <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
+                    data-target="#triggerCollapse{{ run }}{{ trigger }}" aria-expanded="false"
+                    aria-controls="triggerCollapse{{ run }}{{ trigger }}">
+                    <i class="fas fa-caret-right" id="iconTrigger{{ run }}{{ trigger }}"></i>
+                    Trigger {{ trigger }}
+                </button>
+            </h5>
+        </div>
+        <div id="triggerCollapse{{ run }}{{ trigger }}" class="collapse" 
+            aria-labelledby="triggerHeading{{ run }}{{ trigger }}" data-parent="#triggerAccordion{{ run }}">
+            <div class="card-body">
+                {{ trigger_section(run, trigger, availability) }}
+            </div>
+        </div>
+    </div>
+    {% endmacro %}
+
+    {% macro run_card(run, triggers) %}
+    <div class="card mb-3">
+        <div class="card-header" id="heading{{ run }}">
+            <h2 class="mb-0">
+                <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
+                    data-target="#collapse{{ run }}" aria-expanded="false" aria-controls="collapse{{ run }}">
+                    <i class="fas fa-chevron-right" id="iconRun{{ run }}"></i>
+                    Run {{ run }} ({{ triggers|length }} triggers)
+                </button>
+            </h2>
+        </div>
+        <div id="collapse{{ run }}" class="collapse" aria-labelledby="heading{{ run }}" data-parent="#runAccordion">
+            <div class="card-body">
+                <div class="accordion" id="triggerAccordion{{ run }}">
+                    {% for trigger, availability in triggers.items() %}
+                        {{ trigger_card(run, trigger, availability) }}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endmacro %}
+
+    {% if run_trigger_data %}
+    <div class="accordion" id="runAccordion">
+        {% for run, triggers in run_trigger_data.items() %}
+            {{ run_card(run, triggers) }}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-warning" role="alert">
+        <h4 class="alert-heading">No Data Available</h4>
+        <p>No run/trigger combinations found in the data directories.</p>
+        <hr>
+        <p class="mb-0">Please check if the data directories contain files and the file patterns are correct.</p>
+    </div>
+    {% endif %}
+</div>
+<style>
+/* Run card */
+.card { 
+    margin-bottom: 1rem; 
+}
+
+/* Trigger card styling (nested under Runs) */
+.trigger-card .card-header { 
+    background-color: #e9f2ff;  /* light blue for triggers */
+    border-bottom: 1px solid #cce0ff;
+}
+
+/* Buttons & chevrons */
+.btn-link { text-decoration:none; color:#495057; font-weight:500; }
+.btn-link:hover { color:#007bff; }
+.list-unstyled li { margin-bottom:5px; }
+.list-unstyled li a { color:#6c757d; padding:2px 5px; border-radius:3px; transition:0.2s; }
+.list-unstyled li a:hover { background:#e9ecef; color:#495057; }
+
+/* Chevron rotation */
+.fas { transition: transform 0.3s ease; }
+
+/* Optional: subtle card body background for triggers */
+.trigger-card .card-body {
+    background-color: #f0f8ff;  /* very light blue */
+    border-radius: 0 0 5px 5px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Run chevrons
+    document.querySelectorAll('[id^="collapse"]').forEach(c => {
+        c.addEventListener('shown.bs.collapse', () => {
+            const icon = document.getElementById('iconRun' + c.id.replace('collapse',''));
+            if(icon) icon.style.transform = 'rotate(90deg)';
+        });
+        c.addEventListener('hidden.bs.collapse', () => {
+            const icon = document.getElementById('iconRun' + c.id.replace('collapse',''));
+            if(icon) icon.style.transform = 'rotate(0deg)';
+        });
+    });
+
+    // Trigger chevrons
+    document.querySelectorAll('[id^="triggerCollapse"]').forEach(c => {
+        c.addEventListener('shown.bs.collapse', () => {
+            const icon = document.getElementById('iconTrigger' + c.id.replace('triggerCollapse',''));
+            if(icon) icon.style.transform = 'rotate(90deg)';
+        });
+        c.addEventListener('hidden.bs.collapse', () => {
+            const icon = document.getElementById('iconTrigger' + c.id.replace('triggerCollapse',''));
+            if(icon) icon.style.transform = 'rotate(0deg)';
+        });
+    });
+});
+</script>
+{% endblock %}
