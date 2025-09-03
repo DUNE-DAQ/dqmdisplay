@@ -1,6 +1,6 @@
 [project]
-name = "dqmtools"
-version = "0.5.1"
+name = "dqmdisplay"
+version = "1.0.0"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -11,5 +11,7 @@ dependencies = [
     "plotly",
     "tables",
     "tabulate",
-    "tqdm",
 ]
+
+[project.scripts]
+dqm_display="dqm_display.apps.__main__dqm_display__.py"
