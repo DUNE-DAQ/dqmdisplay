@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid-container">
+
+  <div class="row">
+    <div class="col-md-12">
+      {% if run and trigger %}
+        <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, Plane {{ plane }} GRID</h1>
+      {% else %}
+        <h1>ProtoDUNE EVENT DISPLAYS: Latest Plane {{ plane }} GRID</h1>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    {% for ELE in range(0, images|length) %}
+      <div class="col-md-6">
+        <div class="grid-image-container">
+          <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=images[ELE]) }}" alt="alt"/>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  
+</div>
+{% endblock %}

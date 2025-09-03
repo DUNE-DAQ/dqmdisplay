@@ -1,0 +1,15 @@
+[project]
+name = "dqmtools"
+version = "0.5.1"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flask",
+    "kaleido",
+    "numpy",
+    "pandas",
+    "plotly",
+    "tables",
+    "tabulate",
+    "tqdm",
+]
