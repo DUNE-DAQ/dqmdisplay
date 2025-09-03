@@ -272,6 +272,14 @@ def build_run_trigger_lookup():
                 "pds": False
             })["pds"] = True
 
+    # Sort runs and triggers in decreasing order
+    sorted_lookup = {}
+    for run in sorted(lookup.keys(), reverse=True):
+        sorted_lookup[run] = {}
+        for trigger in sorted(lookup[run].keys(), reverse=True):
+            sorted_lookup[run][trigger] = lookup[run][trigger]
+    lookup = sorted_lookup
+
     return lookup
 
 
