@@ -5,195 +5,197 @@
 {% block content %}
 <div class="container-fluid">
     <h1 class="mb-4">Plot Navigator</h1>
-    
+
     {% if run_trigger_data %}
-        <div class="row">
-            <div class="col-12">
-                <div class="accordion" id="runAccordion">
-                    {% for run, triggers in run_trigger_data.items() %}
-                    <div class="card">
-                        <div class="card-header" id="heading{{ run }}">
-                            <h2 class="mb-0">
-                                <button class="btn btn-link btn-block text-left" type="button" 
-                                        data-toggle="collapse" data-target="#collapse{{ run }}" 
-                                        aria-expanded="false" aria-controls="collapse{{ run }}">
-                                    <i class="fas fa-chevron-right" id="icon{{ run }}"></i>
-                                    Run {{ run }} ({{ triggers|length }} triggers)
-                                </button>
-                            </h2>
-                        </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="accordion" id="runAccordion">
+                {% for run, triggers in run_trigger_data.items() %}
+                <div class="card">
+                    <div class="card-header" id="heading{{ run }}">
+                        <h2 class="mb-0">
+                            <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
+                                data-target="#collapse{{ run }}" aria-expanded="false"
+                                aria-controls="collapse{{ run }}">
+                                <i class="fas fa-chevron-right" id="icon{{ run }}"></i>
+                                Run {{ run }} ({{ triggers|length }} triggers)
+                            </button>
+                        </h2>
+                    </div>
 
-                        <div id="collapse{{ run }}" class="collapse" aria-labelledby="heading{{ run }}" data-parent="#runAccordion">
-                            <div class="card-body">
-                                {% for trigger, availability in triggers.items() %}
-                                <div class="trigger-section mb-4">s
-                                    <h5 class="trigger-title">
-                                        <i class="fas fa-caret-right"></i> Trigger {{ trigger }}
-                                    </h5>
-                                    <div class="row">
+                    <div id="collapse{{ run }}" class="collapse" aria-labelledby="heading{{ run }}"
+                        data-parent="#runAccordion">
+                        <div class="card-body">
+                            {% for trigger, availability in triggers.items() %}
+                            <div class="trigger-section mb-4">
+                                <h5 class="trigger-title">
+                                    <i class="fas fa-caret-right"></i> Trigger {{ trigger }}
+                                </h5>
+                                <div class="row">
 
-                                        <!-- Event Display Links -->
-                                        <div class="col-md-4">
-                                            <h6 class="text-primary">Event Displays</h6>
-                                            <ul class="list-unstyled ml-3">
-                                                {% for ele_no in [1,2,3,4,5] %}
-                                                    {% if availability.event_display[ele_no] %}
-                                                    <li>
-                                                        <a href="{{ url_for('run_trigger_event_display', run=run, trigger=trigger, ele=ele_no) }}" 
-                                                           class="text-decoration-none">
-                                                            <i class="fas fa-chart-line"></i> APA/CRP {{ ele_no }} Display
-                                                        </a>
-                                                    </li>
-                                                    <li>
-                                                        <a href="{{ url_for('run_trigger_event_display_grid', run=run, trigger=trigger, ele=ele_no) }}" 
-                                                           class="text-decoration-none">
-                                                            <i class="fas fa-th"></i> APA/CRP {{ ele_no }} Grid
-                                                        </a>
-                                                    </li>
-                                                    {% endif %}
-                                                {% endfor %}
-                                                {% for plane_no in [0,1,2] %}
-                                                    {% if availability.plane_display[plane_no] %}
-                                                    <li>
-                                                        <a href="{{ url_for('run_trigger_event_display_plane', run=run, trigger=trigger, plane=plane_no) }}" 
-                                                           class="text-decoration-none">
-                                                            <i class="fas fa-layer-group"></i> Plane {{ plane_no }} Grid
-                                                        </a>
-                                                    </li>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </ul>
-                                        </div>
+                                    <!-- Event Display Links -->
+                                    <div class="col-md-4">
+                                        <h6 class="text-primary">Event Displays</h6>
+                                        <ul class="list-unstyled ml-3">
+                                            {% for ele_no in [1,2,3,4,5] %}
+                                            {% if availability.event_display[ele_no] %}
+                                            <li>
+                                                <a href="{{ url_for('run_trigger_event_display', run=run, trigger=trigger, ele=ele_no) }}"
+                                                    class="text-decoration-none">
+                                                    <i class="fas fa-chart-line"></i> APA/CRP {{ ele_no }} Display
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a href="{{ url_for('run_trigger_event_display_grid', run=run, trigger=trigger, ele=ele_no) }}"
+                                                    class="text-decoration-none">
+                                                    <i class="fas fa-th"></i> APA/CRP {{ ele_no }} Grid
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                            {% endfor %}
+                                            {% for plane_no in [0,1,2] %}
+                                            {% if availability.plane_display[plane_no] %}
+                                            <li>
+                                                <a href="{{ url_for('run_trigger_event_display_plane', run=run, trigger=trigger, plane=plane_no) }}"
+                                                    class="text-decoration-none">
+                                                    <i class="fas fa-layer-group"></i> Plane {{ plane_no }} Grid
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
 
-                                        <!-- Test Results -->
-                                        <div class="col-md-4">
-                                            <h6 class="text-success">Test Results</h6>
-                                            <ul class="list-unstyled ml-3">
-                                                {% if availability.wib_tests %}
-                                                <li>
-                                                    <a href="{{ url_for('run_trigger_tests_wibs', run=run, trigger=trigger) }}" 
-                                                       class="text-decoration-none">
-                                                        <i class="fas fa-vial"></i> TPC WIB Test Results
-                                                    </a>
-                                                </li>
-                                                {% endif %}
-                                            </ul>
-                                        </div>
+                                    <!-- Test Results -->
+                                    <div class="col-md-4">
+                                        <h6 class="text-success">Test Results</h6>
+                                        <ul class="list-unstyled ml-3">
+                                            {% if availability.wib_tests %}
+                                            <li>
+                                                <a href="{{ url_for('run_trigger_tests_wibs', run=run, trigger=trigger) }}"
+                                                    class="text-decoration-none">
+                                                    <i class="fas fa-vial"></i> TPC WIB Test Results
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
 
-                                        <!-- PDS Plots -->
-                                        <div class="col-md-4">
-                                            <h6 class="text-warning">PDS Plots</h6>
-                                            <ul class="list-unstyled ml-3">
-                                                {% if availability.pds %}
-                                                <li>
-                                                    <a href="{{ url_for('run_trigger_pds', run=run, trigger=trigger) }}" 
-                                                       class="text-decoration-none">
-                                                        <i class="fas fa-chart-area"></i> PDS Plots
-                                                    </a>
-                                                </li>
-                                                {% endif %}
-                                            </ul>
-                                        </div>
+                                    <!-- PDS Plots -->
+                                    <div class="col-md-4">
+                                        <h6 class="text-warning">PDS Plots</h6>
+                                        <ul class="list-unstyled ml-3">
+                                            {% if availability.pds %}
+                                            <li>
+                                                <a href="{{ url_for('run_trigger_pds', run=run, trigger=trigger) }}"
+                                                    class="text-decoration-none">
+                                                    <i class="fas fa-chart-area"></i> PDS Plots
+                                                </a>
+                                            </li>
+                                            {% endif %}
+                                        </ul>
                                     </div>
                                 </div>
-                                {% if not loop.last %}<hr>{% endif %}
-                                {% endfor %}
                             </div>
+                            {% if not loop.last %}
+                            <hr>{% endif %}
+                            {% endfor %}
                         </div>
                     </div>
-                    {% endfor %}
                 </div>
+                {% endfor %}
             </div>
         </div>
+    </div>
     {% else %}
-        <div class="alert alert-warning" role="alert">
-            <h4 class="alert-heading">No Data Available</h4>
-            <p>No run/trigger combinations found in the data directories.</p>
-            <hr>
-            <p class="mb-0">Please check if the data directories contain files and the file patterns are correct.</p>
-        </div>
+    <div class="alert alert-warning" role="alert">
+        <h4 class="alert-heading">No Data Available</h4>
+        <p>No run/trigger combinations found in the data directories.</p>
+        <hr>
+        <p class="mb-0">Please check if the data directories contain files and the file patterns are correct.</p>
+    </div>
     {% endif %}
 </div>
 
 <style>
-.trigger-section {
-    border: 1px solid #e3e6ea;
-    border-radius: 5px;
-    padding: 15px;
-    margin-bottom: 15px;
-    background-color: #f8f9fa;
-}
+    .trigger-section {
+        border: 1px solid #e3e6ea;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background-color: #f8f9fa;
+    }
 
-.trigger-title {
-    color: #495057;
-    border-bottom: 1px solid #dee2e6;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-}
+    .trigger-title {
+        color: #495057;
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
 
-.btn-link {
-    text-decoration: none;
-    color: #495057;
-    font-weight: 500;
-}
+    .btn-link {
+        text-decoration: none;
+        color: #495057;
+        font-weight: 500;
+    }
 
-.btn-link:hover {
-    text-decoration: none;
-    color: #007bff;
-}
+    .btn-link:hover {
+        text-decoration: none;
+        color: #007bff;
+    }
 
-.card-header .btn-link:focus {
-    box-shadow: none;
-}
+    .card-header .btn-link:focus {
+        box-shadow: none;
+    }
 
-.list-unstyled li {
-    margin-bottom: 5px;
-}
+    .list-unstyled li {
+        margin-bottom: 5px;
+    }
 
-.list-unstyled li a {
-    color: #6c757d;
-    padding: 2px 5px;
-    border-radius: 3px;
-    transition: all 0.2s;
-}
+    .list-unstyled li a {
+        color: #6c757d;
+        padding: 2px 5px;
+        border-radius: 3px;
+        transition: all 0.2s;
+    }
 
-.list-unstyled li a:hover {
-    background-color: #e9ecef;
-    color: #495057;
-}
+    .list-unstyled li a:hover {
+        background-color: #e9ecef;
+        color: #495057;
+    }
 
-/* Rotate chevron when accordion is open */
-.collapse.show + .card-header .fas.fa-chevron-right {
-    transform: rotate(90deg);
-}
+    /* Rotate chevron when accordion is open */
+    .collapse.show+.card-header .fas.fa-chevron-right {
+        transform: rotate(90deg);
+    }
 
-.fas {
-    transition: transform 0.3s ease;
-}
+    .fas {
+        transition: transform 0.3s ease;
+    }
 </style>
 
 <script>
-// Add rotation effect to chevron icons
-document.addEventListener('DOMContentLoaded', function() {
-    const collapseElements = document.querySelectorAll('.collapse');
-    
-    collapseElements.forEach(function(collapseEl) {
-        collapseEl.addEventListener('shown.bs.collapse', function() {
-            const runId = this.id.replace('collapse', '');
-            const icon = document.getElementById('icon' + runId);
-            if (icon) {
-                icon.style.transform = 'rotate(90deg)';
-            }
-        });
-        
-        collapseEl.addEventListener('hidden.bs.collapse', function() {
-            const runId = this.id.replace('collapse', '');
-            const icon = document.getElementById('icon' + runId);
-            if (icon) {
-                icon.style.transform = 'rotate(0deg)';
-            }
+    // Add rotation effect to chevron icons
+    document.addEventListener('DOMContentLoaded', function () {
+        const collapseElements = document.querySelectorAll('.collapse');
+
+        collapseElements.forEach(function (collapseEl) {
+            collapseEl.addEventListener('shown.bs.collapse', function () {
+                const runId = this.id.replace('collapse', '');
+                const icon = document.getElementById('icon' + runId);
+                if (icon) {
+                    icon.style.transform = 'rotate(90deg)';
+                }
+            });
+
+            collapseEl.addEventListener('hidden.bs.collapse', function () {
+                const runId = this.id.replace('collapse', '');
+                const icon = document.getElementById('icon' + runId);
+                if (icon) {
+                    icon.style.transform = 'rotate(0deg)';
+                }
+            });
         });
     });
-});
 </script>
 {% endblock %}
