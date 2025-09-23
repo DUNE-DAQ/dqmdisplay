@@ -19,7 +19,7 @@ class PlotAvailability(NamedTuple):
 
 class AppManager():
     def __init__(self, path_list: List[str], database: DQMImageDatabase,
-                 html_path: str, name_prefix: Optional[str]=None, name_suffix: Optional[str]=None):
+                 html_path: str, name_prefix: Optional[str]=None, name_suffix: Optional[str]=None, latest: bool=False):
         
         # Set up prefix/suffix
         self._name_prefix = name_prefix
@@ -29,6 +29,7 @@ class AppManager():
         self._database = database
 
         self._path_list = path_list
+        self._latest=latest
 
     @property
     def name_prefix(self):
@@ -47,26 +48,32 @@ class AppManager():
         if not self._path_list:
             return ""
         
-        "".join(f"/{p}:<{p}>" for p in self._path_list)
+        return "".join(f"/{p}:<{p}>" for p in self._path_list)
 
     @property
     def db_url(self):
         full_path = f"/{self._database.name}{self.name_suffix}{self.data_path}"
         if self._name_prefix is not None:
             full_path = f"{full_path}/{self._name_prefix}"
-            
-        print(full_path)
+
         return full_path
     
     def add_image_to_app(self, **kwargs):
-        images = self._database.dataframe.get_eq(**kwargs)
-        if not images.empty:
+
+        if self._latest:
+            images, vals = self._database.dataframe.get_latest(**kwargs)
+        else:
+            images = self._database.dataframe.get_eq(**kwargs)
+            vals = kwargs
+        
+        
+        if (not images is None) and (not images.empty):
             images = [i.name for i in images[self._database.name]]
         else:
             images = []
 
-        _, next_args = self._database.dataframe.get_next(**{k: v for k, v in kwargs.items() if k in ['run', 'trigger']})
-        _, prev_args = self._database.dataframe.get_prev(**{k: v for k, v in kwargs.items() if k in ['run', 'trigger']})
+        _, next_args = self._database.dataframe.get_next(**{k: v for k, v in vals.items() if k in ['run', 'trigger']})
+        _, prev_args = self._database.dataframe.get_prev(**{k: v for k, v in vals.items() if k in ['run', 'trigger']})
         
         # Build navigation URLs
         next_url = None
@@ -74,16 +81,16 @@ class AppManager():
         
         if next_args:
             # Merge the navigation args with current path-specific args
-            next_kwargs = {**{k: v for k, v in kwargs.items() if k not in ['run', 'trigger']}, **next_args}
+            next_kwargs = {**{k: v for k, v in vals.items() if k not in ['run', 'trigger']}, **next_args}
             next_url = url_for(self.endpoint, **next_kwargs)
             
         if prev_args:
-            prev_kwargs = {**{k: v for k, v in kwargs.items() if k not in ['run', 'trigger']}, **prev_args}
+            prev_kwargs = {**{k: v for k, v in vals.items() if k not in ['run', 'trigger']}, **prev_args}
             prev_url = url_for(self.endpoint, **prev_kwargs)
         
         return render_template(self._html_path, images=images, 
                              next_url=next_url, prev_url=prev_url, 
-                             **kwargs)
+                             **vals)
     
     def __call__(self, app: Flask):
         app.add_url_rule(self.db_url, self.endpoint, self.add_image_to_app)
@@ -171,11 +178,12 @@ class DQMDisplay:
         main_cols = self.MERGE_ON + cols
         
         # Add to the app
+        print(db.name, main_cols)
+        
         AppManager(main_cols, db, opts.get('html',''))(app)
         # Add latest to the app
-        AppManager(cols, db, opts.get('html',''), 'latest')(app)
+        AppManager(cols, db, opts.get('html',''), 'latest', latest=True)(app)
         
-            
         # Now we add the additional pages
         if not (extras:=opts.get('extra_views', None)):
             return
@@ -184,9 +192,9 @@ class DQMDisplay:
             # We're going to make a single extra path
             extra_path = self.MERGE_ON + extra_opts.get('additional_cols', [])
             # Add to the app
-            AppManager(extra_path, db, opts.get('html',''), extra_name)(app)
+            AppManager(extra_path, db, opts.get('html',''), name_suffix=extra_name)(app)
             # Add latest to the app
-            AppManager(extra_opts.get('additional_cols', []), db, opts.get('html',''), 'latest', extra_name)(app)
+            AppManager(extra_opts.get('additional_cols', []), db, opts.get('html',''), name_prefix='latest', name_suffix=extra_name, latest=True)(app)
 
     @lru_cache(maxsize=1)
     def add_plot_navigator(self):
