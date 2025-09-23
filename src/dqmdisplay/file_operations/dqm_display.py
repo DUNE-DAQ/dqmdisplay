@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import List, Optional, Dict, Any, NamedTuple
+from typing import List, Optional, NamedTuple
+from functools import lru_cache
 
 from flask import Flask, render_template, url_for
 
@@ -15,47 +16,57 @@ class PlotAvailability(NamedTuple):
     wib_tests: bool  
     pds: bool
 
-def make_db_url(path_dict: Dict[str, str|int], database: DQMImageDatabase, name_suffix: Optional[str] = None):
-    '''helper function to make a database URL
-    '''
-    name = database.name
-    if name_suffix is not None:
-        name+=f"_{name_suffix}"
-                
-    full_path = f"/{name}"+"".join(f"/{p}:{v}" for p, v in path_dict.items())
-    print(f"making {full_path}")
 
-    return full_path
+class AppManager():
+    def __init__(self, path_list: List[str], database: DQMImageDatabase,
+                 html_path: str, name_prefix: Optional[str]=None, name_suffix: Optional[str]=None):
+        
+        # Set up prefix/suffix
+        self._name_prefix = name_prefix
+        self._name_suffix = name_suffix
+        
+        self._html_path = html_path
+        self._database = database
 
-def make_endpoint(database: DQMImageDatabase, name_suffix: Optional[str]=None):
-    if name_suffix is None:
-        name_suffix=""
-    else:
-        name_suffix = f"_{name_suffix}"
+        self._path_list = path_list
 
-    return f"{database.name+name_suffix}"
+    @property
+    def name_prefix(self):
+        return f"{self._name_prefix}_" if self._name_prefix is not None else ""
+        
+    @property
+    def name_suffix(self):
+        return f"_{self._name_suffix}" if self._name_suffix is not None else ""
+
+    @property
+    def endpoint(self):
+        return f"{self.name_prefix}{self._database.name}{self.name_suffix}"
     
+    @property
+    def data_path(self):
+        if not self._path_list:
+            return ""
+        
+        "".join(f"/{p}:<{p}>" for p in self._path_list)
 
-def add_image_display_app(app: Flask, path_list: List[str], database: DQMImageDatabase, html_path: str,
-                     name_suffix: Optional[str] = None):
-    ''' Adds to a Flask app
-    '''
+    @property
+    def db_url(self):
+        full_path = f"/{self._database.name}{self.name_suffix}{self.data_path}"
+        if self._name_prefix is not None:
+            full_path = f"{full_path}/{self._name_prefix}"
+            
+        print(full_path)
+        return full_path
     
-    full_path = make_db_url({p:f"<{p}>" for p in path_list}, database, name_suffix)
-    
-    endpoint = make_endpoint(database, name_suffix)
-
-    
-    def add_to_app(**kwargs):
-        images = database.dataframe.get_eq(**kwargs)
+    def add_image_to_app(self, **kwargs):
+        images = self._database.dataframe.get_eq(**kwargs)
         if not images.empty:
-            images = [i.name for i in images[database.name]]
+            images = [i.name for i in images[self._database.name]]
         else:
             images = []
-        
-        # Get navigation info
-        _, next_args = database.dataframe.get_next(**{k: v for k, v in kwargs.items() if k in ['run', 'trigger']})
-        _, prev_args = database.dataframe.get_prev(**{k: v for k, v in kwargs.items() if k in ['run', 'trigger']})
+
+        _, next_args = self._database.dataframe.get_next(**{k: v for k, v in kwargs.items() if k in ['run', 'trigger']})
+        _, prev_args = self._database.dataframe.get_prev(**{k: v for k, v in kwargs.items() if k in ['run', 'trigger']})
         
         # Build navigation URLs
         next_url = None
@@ -64,98 +75,18 @@ def add_image_display_app(app: Flask, path_list: List[str], database: DQMImageDa
         if next_args:
             # Merge the navigation args with current path-specific args
             next_kwargs = {**{k: v for k, v in kwargs.items() if k not in ['run', 'trigger']}, **next_args}
-            next_url = url_for(endpoint, **next_kwargs)
+            next_url = url_for(self.endpoint, **next_kwargs)
             
         if prev_args:
             prev_kwargs = {**{k: v for k, v in kwargs.items() if k not in ['run', 'trigger']}, **prev_args}
-            prev_url = url_for(endpoint, **prev_kwargs)
+            prev_url = url_for(self.endpoint, **prev_kwargs)
         
-        return render_template(html_path, images=images, 
+        return render_template(self._html_path, images=images, 
                              next_url=next_url, prev_url=prev_url, 
                              **kwargs)
-
-    app.add_url_rule(full_path, endpoint, add_to_app)
-
-def add_latest_to_app(app, path_list: List[str], database: DQMImageDatabase, html_path: str,
-                     name_suffix: Optional[str] = None):
-
-    endpoint = f"latest_{make_endpoint(database, name_suffix)}"
     
-    full_path = make_db_url({p:f"<{p}>" for p in path_list}, database, name_suffix)
-    full_path  += "/latest"
-    print(f"Making latest {full_path}, {endpoint}")
-
-    def add_to_app(**kwargs):
-        merge_on = ['run', 'trigger']
-
-        # Means we KNOW what latest refers to
-        images, vals = database.dataframe.get_latest(merge_on, **kwargs)
-        
-        if images is not None and not images.empty:
-            images = [i.name for i in images[database.name]]
-        else:
-            images = []
-        
-        # Get navigation info for latest
-        _, next_args = database.dataframe.get_next(**vals) if vals else (None, {})
-        _, prev_args = database.dataframe.get_prev(**vals) if vals else (None, {})
-        
-        # Build navigation URLs
-        next_url = None
-        prev_url = None
-        
-        if next_args:
-            next_kwargs = {**kwargs, **next_args}
-            next_url = url_for(make_endpoint(database, name_suffix), **next_kwargs)
-            
-        if prev_args:
-            prev_kwargs = {**kwargs, **prev_args}
-            prev_url = url_for(make_endpoint(database, name_suffix), **prev_kwargs)
-        
-        return render_template(html_path, images=images, 
-                             next_url=next_url, prev_url=prev_url, 
-                             **vals)
-
-    app.add_url_rule(full_path, endpoint, add_to_app)
-
-def add_plot_navigator(app: Flask, main_database: ImageExistsDatabase):
-    """Add a simplified plot navigator that shows available data types per run/trigger"""
-    
-    @app.route('/navigator')
-    def plot_navigator():
-        # Get the merged dataframe with availability info
-        df = main_database.as_navigable().as_dataframe()
-        
-        if df.empty:
-            return render_template('plot_navigator.html', run_trigger_data={})
-        
-        # Group by run and create a simplified structure
-        run_trigger_data = {}
-        
-        for _, row in df.iterrows():
-            run = int(row['run'])
-            trigger = int(row['trigger'])
-            
-            if run not in run_trigger_data:
-                run_trigger_data[run] = {}
-            
-            # Simplified availability - if event_display exists, all variants exist
-            availability = PlotAvailability(
-                event_display=bool(row.get('event_display', False)),
-                wib_tests=bool(row.get('tests_wibs', False)),
-                pds=bool(row.get('pds', False))
-            )
-            
-            run_trigger_data[run][trigger] = availability
-        
-        # Sort runs in descending order (most recent first)
-        run_trigger_data = dict(sorted(run_trigger_data.items(), reverse=True))
-        
-        # Sort triggers within each run in descending order
-        for run in run_trigger_data:
-            run_trigger_data[run] = dict(sorted(run_trigger_data[run].items(), reverse=True))
-        
-        return render_template('plot_navigator.html', run_trigger_data=run_trigger_data)
+    def __call__(self, app: Flask):
+        app.add_url_rule(self.db_url, self.endpoint, self.add_image_to_app)
 
 
 class DQMDisplay:
@@ -218,18 +149,6 @@ class DQMDisplay:
     def database(self):
         return self._main_database
     
-    def link_app(self, app: Flask):
-        '''
-        Slightly over complicated wrapper for dynamically generating flask app routes
-        '''    
-        for db_name in self.CONFIG_DICT.keys():
-            # Now we route      
-            self.add_db_opt(app, db_name)      
-        
-        # Add the simplified plot navigator
-        add_plot_navigator(app, self._main_database)
-            
-    
     def add_db_opt(self, app: Flask, db_name: str):
         '''
         Adds the image options for a single database
@@ -250,10 +169,12 @@ class DQMDisplay:
             cols = opts.get('additional_cols', [])
             
         main_cols = self.MERGE_ON + cols
-        print(main_cols)
-    
-        add_image_display_app(app, main_cols, db, opts.get('html',''))
-        add_latest_to_app(app, cols, db, opts.get('html',''))
+        
+        # Add to the app
+        AppManager(main_cols, db, opts.get('html',''))(app)
+        # Add latest to the app
+        AppManager(cols, db, opts.get('html',''), 'latest')(app)
+        
             
         # Now we add the additional pages
         if not (extras:=opts.get('extra_views', None)):
@@ -262,5 +183,54 @@ class DQMDisplay:
         for extra_name, extra_opts in extras.items():
             # We're going to make a single extra path
             extra_path = self.MERGE_ON + extra_opts.get('additional_cols', [])
-            add_image_display_app(app, extra_path, db, opts.get('html',''), extra_name)
-            add_latest_to_app(app, extra_opts.get('additional_cols', []), db, opts.get('html',''), extra_name)
+            # Add to the app
+            AppManager(extra_path, db, opts.get('html',''), extra_name)(app)
+            # Add latest to the app
+            AppManager(extra_opts.get('additional_cols', []), db, opts.get('html',''), 'latest', extra_name)(app)
+
+    @lru_cache(maxsize=1)
+    def add_plot_navigator(self):
+        df = self._main_database.as_navigable().as_dataframe()
+        
+        if df.empty:
+            return render_template('plot_navigator.html', run_trigger_data={})
+        
+        # Group by run and create a simplified structure
+        run_trigger_data = {}
+        
+        for _, row in df.iterrows():
+            run = int(row['run'])
+            trigger = int(row['trigger'])
+            
+            if run not in run_trigger_data:
+                run_trigger_data[run] = {}
+            
+            # Simplified availability - if event_display exists, all variants exist
+            availability = PlotAvailability(
+                event_display=bool(row.get('event_display', False)),
+                wib_tests=bool(row.get('tests_wibs', False)),
+                pds=bool(row.get('pds', False))
+            )
+            
+            run_trigger_data[run][trigger] = availability
+        
+        # Sort runs in descending order (most recent first)
+        run_trigger_data = dict(sorted(run_trigger_data.items(), reverse=True))
+        
+        # Sort triggers within each run in descending order
+        for run in run_trigger_data:
+            run_trigger_data[run] = dict(sorted(run_trigger_data[run].items(), reverse=True))
+        
+        return render_template('plot_navigator.html', run_trigger_data=run_trigger_data)
+
+    
+    def link_app(self, app: Flask):
+        '''
+        Slightly over complicated wrapper for dynamically generating flask app routes
+        '''    
+        for db_name in self.CONFIG_DICT.keys():
+            # Now we route      
+            self.add_db_opt(app, db_name)      
+        
+        # Add the simplified plot navigator
+        app.add_url_rule('/navigator', 'plot_navigator', self.add_plot_navigator)

@@ -19,20 +19,14 @@ class NaviagableDataframe:
     Wrapper object to simplify dataframe queries allowing for more natural next/prev operations
     '''
     def __init__(self, dataframe: pd.DataFrame):
-        dataframe.sort_values(list(dataframe.columns), ascending=True, inplace=True)
+        dataframe.sort_values(list(dataframe.columns), ascending=False, inplace=True)
         self._dataframe = dataframe
     
     
     def as_dataframe(self)->pd.DataFrame:
         '''Returns the raw pandas dataframe'''
         return self._dataframe
-    
-
-    def query_db_cond(self, condition: Callable[..., pd.DataFrame], **kwargs)->pd.DataFrame:
-        '''Safe wrapper to ensure we check dataframe nicely'''
-        check_cols_in_db(self._dataframe, list(kwargs.keys()))
-        return self._dataframe[condition(kwargs)]
-    
+        
     def get_eq(self, **kwargs)->'pd.DataFrame':
         '''Check if values in dict are equal to kwargs'''
         mask = pd.Series(True, index=self._dataframe.index)        
@@ -46,43 +40,51 @@ class NaviagableDataframe:
         '''
         Get the prev row(s) from the one satisfying **kwargs
         '''
-        cond = lambda k, v: self._dataframe[k] > v
-        return self._get_adjacent(cond, True, **kwargs)
+        return self._get_adjacent(False, **kwargs)
 
     def get_prev(self, **kwargs)->Tuple[pd.DataFrame, Dict[str, int]] | Tuple[None, dict]:
         '''
         Get the next row(s) from the one satisfying **kwargs
         '''
-        cond = lambda k, v: self._dataframe[k] < v
-        return self._get_adjacent(cond, False, **kwargs)
+        return self._get_adjacent(True, **kwargs)
 
     
-    def _get_adjacent(self, condition: Callable[[str, int], pd.Series], ascending: bool, **kwargs):
+    def _get_adjacent(self, prev: bool, **kwargs):
         mask = pd.Series(True, index=self._dataframe.index)
         # We go back through the mask
         mask_dict = {k: self._dataframe[k]==int(v) for k, v in kwargs.items()}
+        
+        key_search = list(mask_dict.keys())
+        key_search.reverse()
+        
         # Go backwards through dict
-        for k in reversed(mask_dict.keys()):
-            mask_dict[k] = condition(k, int(kwargs[k]))
-            m_copy = mask.copy()
+        for k in key_search:
+            if prev:
+                mask_dict[k] = self._dataframe[k].astype(int)<int(kwargs[k])
+            else:
+                mask_dict[k] = self._dataframe[k].astype(int)>int(kwargs[k])
+            
+            m_copy = pd.Series(True, index=self._dataframe.index)
             for m in mask_dict.values():
                 m_copy &= m
 
             if not self._dataframe[m_copy].empty:
                 mask = m_copy
                 break
+            else:
+                mask_dict.pop(k)
+        else:
+            return None, {}
 
         adj = self._dataframe[mask]
         kwarg_list = list(kwargs.keys())
         
-        sort_adj = adj.sort_values(kwarg_list, inplace=False, ascending=ascending)
+        # We now sort (either get the smallest or largest entry)
+        sort_adj = adj.sort_values(kwarg_list, inplace=False, ascending=not prev)
 
         top = sort_adj.iloc[0]
         search_cond = {s: top[s] for s in kwargs.keys()}
         return self.get_eq(**search_cond), search_cond
-
-
-        
 
     def get_latest(self, merge_on = ['run', 'trigger'], **kwargs)->Tuple[pd.DataFrame, Dict[str, Any]] | Tuple[None, dict]:
         '''
