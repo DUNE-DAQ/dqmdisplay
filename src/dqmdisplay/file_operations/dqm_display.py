@@ -177,9 +177,7 @@ class DQMDisplay:
             
         main_cols = self.MERGE_ON + cols
         
-        # Add to the app
-        print(db.name, main_cols)
-        
+        # Add to the app        
         AppManager(main_cols, db, opts.get('html',''))(app)
         # Add latest to the app
         AppManager(cols, db, opts.get('html',''), 'latest', latest=True)(app)
