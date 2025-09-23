@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional, NamedTuple
 from functools import lru_cache
 
-from flask import Flask, render_template, url_for
+from flask import Flask, render_template, url_for, request
 
 from dqmdisplay.file_operations.file_database import ImageExistsDatabase, DQMImageDatabase
 
@@ -197,39 +197,104 @@ class DQMDisplay:
             AppManager(extra_opts.get('additional_cols', []), db, opts.get('html',''), name_prefix='latest', name_suffix=extra_name, latest=True)(app)
 
     @lru_cache(maxsize=1)
-    def add_plot_navigator(self):
+    def _get_plot_navigator_data(self):
+        """Cached method to get the raw plot availability data"""
         df = self._main_database.as_navigable().as_dataframe()
         
         if df.empty:
-            return render_template('plot_navigator.html', run_trigger_data={})
+            return {}
         
-        # Group by run and create a simplified structure
+        # Group by run and trigger more efficiently
         run_trigger_data = {}
         
-        for _, row in df.iterrows():
-            run = int(row['run'])
-            trigger = int(row['trigger'])
+        # Use groupby for better performance
+        grouped = df.groupby(['run', 'trigger'])
+        
+        for (run, trigger), group in grouped:
+            run = int(run)
+            trigger = int(trigger)
             
             if run not in run_trigger_data:
                 run_trigger_data[run] = {}
             
-            # Simplified availability - if event_display exists, all variants exist
+            # Actually check if each plot type has data by looking at the specific columns
+            # The database columns should contain boolean values or counts indicating availability
+            row = group.iloc[0]  # Get first (should be only) row for this run/trigger
+            
             availability = PlotAvailability(
-                event_display=bool(row.get('event_display', False)),
-                wib_tests=bool(row.get('tests_wibs', False)),
-                pds=bool(row.get('pds', False))
+                event_display=bool(row.get('event_display', 0)),
+                wib_tests=bool(row.get('tests_wibs', 0)), 
+                pds=bool(row.get('pds', 0))
             )
             
             run_trigger_data[run][trigger] = availability
         
-        # Sort runs in descending order (most recent first)
-        run_trigger_data = dict(sorted(run_trigger_data.items(), reverse=True))
+        # Sort runs and triggers in descending order
+        sorted_data = {}
+        for run in sorted(run_trigger_data.keys(), reverse=True):
+            sorted_data[run] = dict(sorted(run_trigger_data[run].items(), reverse=True))
         
-        # Sort triggers within each run in descending order
-        for run in run_trigger_data:
-            run_trigger_data[run] = dict(sorted(run_trigger_data[run].items(), reverse=True))
+        return sorted_data
+
+
+    def add_plot_navigator(self):
+        """Fast plot navigator that uses cached data computation with pagination"""
+        run_trigger_data = self._get_plot_navigator_data()
         
-        return render_template('plot_navigator.html', run_trigger_data=run_trigger_data)
+        # Get pagination parameters from request
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))  # Default 20 entries per page
+        
+        # Available per_page options
+        per_page_options = [10, 20, 50, 100]
+        if per_page not in per_page_options:
+            per_page = 20  # Default fallback
+        
+        # Flatten the data into a list for pagination
+        all_entries = []
+        for run in sorted(run_trigger_data.keys(), reverse=True):
+            for trigger in sorted(run_trigger_data[run].keys(), reverse=True):
+                all_entries.append({
+                    'run': run,
+                    'trigger': trigger,
+                    'availability': run_trigger_data[run][trigger]
+                })
+        
+        # Calculate pagination
+        total_entries = len(all_entries)
+        total_pages = (total_entries + per_page - 1) // per_page  # Ceiling division
+        
+        # Ensure page is within valid range
+        page = max(1, min(page, total_pages))
+        
+        # Get entries for current page
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        page_entries = all_entries[start_idx:end_idx]
+        
+        # Calculate pagination info
+        has_prev = page > 1
+        has_next = page < total_pages
+        prev_page = page - 1 if has_prev else None
+        next_page = page + 1 if has_next else None
+        
+        # Generate page range for pagination controls (show up to 5 pages around current)
+        page_range_start = max(1, page - 2)
+        page_range_end = min(total_pages, page + 2)
+        page_range = list(range(page_range_start, page_range_end + 1))
+        
+        return render_template('plot_navigator.html', 
+                            page_entries=page_entries,
+                            current_page=page,
+                            total_pages=total_pages,
+                            total_entries=total_entries,
+                            per_page=per_page,
+                            per_page_options=per_page_options,
+                            has_prev=has_prev,
+                            has_next=has_next,
+                            prev_page=prev_page,
+                            next_page=next_page,
+                            page_range=page_range)
 
     
     def link_app(self, app: Flask):
