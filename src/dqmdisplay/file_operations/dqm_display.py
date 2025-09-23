@@ -238,51 +238,59 @@ class DQMDisplay:
         
         return sorted_data
 
-
     def add_plot_navigator(self):
-        """Fast plot navigator that uses cached data computation with pagination"""
+        """Optimized plot navigator with faster loading"""
+        # Get pagination parameters first to avoid processing unnecessary data
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 50))  # Increased default for fewer requests
+        per_page_options = [20, 50, 100, 200]
+        
+        if per_page not in per_page_options:
+            per_page = 50
+        
+        # Get cached data
         run_trigger_data = self._get_plot_navigator_data()
         
-        # Get pagination parameters from request
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 20))  # Default 20 entries per page
+        if not run_trigger_data:
+            return render_template('plot_navigator.html', page_entries=[])
         
-        # Available per_page options
-        per_page_options = [10, 20, 50, 100]
-        if per_page not in per_page_options:
-            per_page = 20  # Default fallback
+        # Pre-sort runs for efficiency
+        sorted_runs = sorted(run_trigger_data.keys(), reverse=True)
+        total_entries = len(sorted_runs)
+        total_pages = (total_entries + per_page - 1) // per_page
         
-        # Flatten the data into a list for pagination
-        all_entries = []
-        for run in sorted(run_trigger_data.keys(), reverse=True):
-            for trigger in sorted(run_trigger_data[run].keys(), reverse=True):
-                all_entries.append({
-                    'run': run,
-                    'trigger': trigger,
-                    'availability': run_trigger_data[run][trigger]
-                })
-        
-        # Calculate pagination
-        total_entries = len(all_entries)
-        total_pages = (total_entries + per_page - 1) // per_page  # Ceiling division
-        
-        # Ensure page is within valid range
+        # Validate and clamp page
         page = max(1, min(page, total_pages))
         
-        # Get entries for current page
+        # Only process runs for current page
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
-        page_entries = all_entries[start_idx:end_idx]
+        current_page_runs = sorted_runs[start_idx:end_idx]
         
-        # Calculate pagination info
+        # Build minimal data structure for current page only
+        page_entries = []
+        for run in current_page_runs:
+            # Sort triggers once
+            sorted_triggers = sorted(run_trigger_data[run].keys(), reverse=True)
+            triggers = [{
+                'trigger': trigger,
+                'availability': run_trigger_data[run][trigger]
+            } for trigger in sorted_triggers]
+            
+            page_entries.append({
+                'run': run,
+                'triggers': triggers
+            })
+        
+        # Pagination info
         has_prev = page > 1
         has_next = page < total_pages
         prev_page = page - 1 if has_prev else None
         next_page = page + 1 if has_next else None
         
-        # Generate page range for pagination controls (show up to 5 pages around current)
-        page_range_start = max(1, page - 2)
-        page_range_end = min(total_pages, page + 2)
+        # Optimized page range (fewer buttons for better UX)
+        page_range_start = max(1, page - 3)
+        page_range_end = min(total_pages, page + 3)
         page_range = list(range(page_range_start, page_range_end + 1))
         
         return render_template('plot_navigator.html', 
@@ -297,8 +305,6 @@ class DQMDisplay:
                             prev_page=prev_page,
                             next_page=next_page,
                             page_range=page_range)
-
-    
     def link_app(self, app: Flask):
         '''
         Slightly over complicated wrapper for dynamically generating flask app routes

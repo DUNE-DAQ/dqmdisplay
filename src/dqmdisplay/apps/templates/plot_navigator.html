@@ -11,7 +11,7 @@
         <div class="row mb-3">
             <div class="col-md-6">
                 <div class="d-flex align-items-center">
-                    <label for="per-page-select" class="form-label me-2">Entries per page:</label>
+                    <label for="per-page-select" class="form-label me-2">Runs per page:</label>
                     <select id="per-page-select" class="form-select" style="width: auto;" onchange="changePerPage(this.value)">
                         {% for option in per_page_options %}
                             <option value="{{ option }}" {% if option == per_page %}selected{% endif %}>
@@ -23,132 +23,144 @@
             </div>
             <div class="col-md-6 text-end">
                 <span class="text-muted">
-                    {% set end_entry = current_page * per_page %}
-                    {% if end_entry > total_entries %}
-                        {% set end_entry = total_entries %}
-                    {% endif %}
                     Showing {{ (current_page - 1) * per_page + 1 }} - 
-                    {{ end_entry }} of {{ total_entries }} entries
+                    {% set end_entry = current_page * per_page %}
+                    {% if end_entry > total_entries %}{{ total_entries }}{% else %}{{ end_entry }}{% endif %}
+                    of {{ total_entries }} runs
                 </span>
             </div>
         </div>
 
-        <!-- Plot Entries -->
+        <!-- Simplified Plot Entries -->
         <div class="plot-entries">
-            {% for entry in page_entries %}
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
-                            data-target="#collapse{{ entry.run }}_{{ entry.trigger }}" aria-expanded="false" 
-                            aria-controls="collapse{{ entry.run }}_{{ entry.trigger }}">
-                            <i class="fas fa-chevron-right" id="icon{{ entry.run }}_{{ entry.trigger }}"></i>
-                            Run {{ entry.run }}, Trigger {{ entry.trigger }}
-                        </button>
-                    </h5>
+            {% for run_data in page_entries %}
+            <div class="card mb-2">
+                <div class="card-header py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <button class="btn btn-link btn-sm text-left p-0" type="button" onclick="toggleRun({{ run_data.run }})">
+                                <i class="fas fa-chevron-right" id="icon{{ run_data.run }}"></i>
+                                <strong>Run {{ run_data.run }}</strong> ({{ run_data.triggers|length }} triggers)
+                            </button>
+                        </h6>
+                        <!-- Quick action buttons -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            {% set first_trigger = run_data.triggers[0] %}
+                            {% if first_trigger.availability.event_display %}
+                                <a href="{{ url_for('latest_event_display', element_id=1) }}?run={{ run_data.run }}" 
+                                   class="btn btn-outline-primary btn-sm" title="Latest Event Display">
+                                    <i class="fas fa-chart-line"></i>
+                                </a>
+                            {% endif %}
+                            {% if first_trigger.availability.tests_wibs %}
+                                <a href="{{ url_for('latest_tests_wibs') }}?run={{ run_data.run }}" 
+                                   class="btn btn-outline-success btn-sm" title="Latest WIB Tests">
+                                    <i class="fas fa-vial"></i>
+                                </a>
+                            {% endif %}
+                            {% if first_trigger.availability.pds %}
+                                <a href="{{ url_for('latest_pds') }}?run={{ run_data.run }}" 
+                                   class="btn btn-outline-warning btn-sm" title="Latest PDS">
+                                    <i class="fas fa-chart-area"></i>
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                <div id="collapse{{ entry.run }}_{{ entry.trigger }}" class="collapse">
-                    <div class="card-body">
+                
+                <div id="runContent{{ run_data.run }}" class="collapse">
+                    <div class="card-body py-2">
                         <div class="row">
-                            <!-- Event Displays Column -->
-                            <div class="col-md-4">
-                                <h6 class="text-primary">
-                                    <i class="fas fa-chart-line"></i> Event Displays
-                                </h6>
-                                
-                                {% if entry.availability.event_display %}
-                                    <ul class="list-unstyled ml-3">
-                                        <!-- Element Display Links -->
-                                        {% for ele_no in [1,2,3,4,5] %}
-                                            <li>
-                                                <a href="{{ url_for('event_display', run=entry.run, trigger=entry.trigger, element_id=ele_no) }}" 
-                                                   class="text-decoration-none">
-                                                    <i class="fas fa-chart-line"></i> APA/CRP {{ ele_no }} Display
+                            {% for trigger_data in run_data.triggers %}
+                            <div class="col-md-4 mb-2">
+                                <div class="border rounded p-2 bg-light">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="font-weight-bold">Trigger {{ trigger_data.trigger }}</small>
+                                        <div class="btn-group btn-group-sm">
+                                            {% if trigger_data.availability.event_display %}
+                                                <div class="dropdown">
+                                                    <button class="btn btn-primary btn-sm dropdown-toggle" type="button" 
+                                                            data-toggle="dropdown" title="Event Displays">
+                                                        <i class="fas fa-chart-line"></i>
+                                                    </button>
+                                                    <div class="dropdown-menu">
+                                                        {% for ele_no in [1,2,3,4,5] %}
+                                                            <a class="dropdown-item" href="{{ url_for('event_display', run=run_data.run, trigger=trigger_data.trigger, element_id=ele_no) }}">
+                                                                APA/CRP {{ ele_no }}
+                                                            </a>
+                                                        {% endfor %}
+                                                        <div class="dropdown-divider"></div>
+                                                        {% for plane_no in [0,1,2] %}
+                                                            <a class="dropdown-item" href="{{ url_for('event_display_plane', run=run_data.run, trigger=trigger_data.trigger, plane=plane_no) }}">
+                                                                Plane {{ plane_no }}
+                                                            </a>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm" disabled title="No Event Displays">
+                                                    <i class="fas fa-chart-line"></i>
+                                                </button>
+                                            {% endif %}
+                                            
+                                            {% if trigger_data.availability.tests_wibs %}
+                                                <a href="{{ url_for('tests_wibs', run=run_data.run, trigger=trigger_data.trigger) }}" 
+                                                   class="btn btn-success btn-sm" title="WIB Tests">
+                                                    <i class="fas fa-vial"></i>
                                                 </a>
-                                            </li>
-                                            <li>
-                                                <a href="{{ url_for('event_display_grid', run=entry.run, trigger=entry.trigger, element_id=ele_no) }}" 
-                                                   class="text-decoration-none">
-                                                    <i class="fas fa-th"></i> APA/CRP {{ ele_no }} Grid
+                                            {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm" disabled title="No WIB Tests">
+                                                    <i class="fas fa-vial"></i>
+                                                </button>
+                                            {% endif %}
+                                            
+                                            {% if trigger_data.availability.pds %}
+                                                <a href="{{ url_for('pds', run=run_data.run, trigger=trigger_data.trigger) }}" 
+                                                   class="btn btn-warning btn-sm" title="PDS Plots">
+                                                    <i class="fas fa-chart-area"></i>
                                                 </a>
-                                            </li>
-                                        {% endfor %}
-                                        
-                                        <!-- Plane Display Links -->
-                                        {% for plane_no in [0,1,2] %}
-                                            <li>
-                                                <a href="{{ url_for('event_display_plane', run=entry.run, trigger=entry.trigger, plane=plane_no) }}" 
-                                                   class="text-decoration-none">
-                                                    <i class="fas fa-layer-group"></i> Plane {{ plane_no }} Grid
-                                                </a>
-                                            </li>
-                                        {% endfor %}
-                                    </ul>
-                                {% else %}
-                                    <p class="text-muted ml-3">
-                                        <i class="fas fa-exclamation-circle"></i> No event displays available
-                                    </p>
-                                {% endif %}
+                                            {% else %}
+                                                <button class="btn btn-outline-secondary btn-sm" disabled title="No PDS Plots">
+                                                    <i class="fas fa-chart-area"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-
-                            <!-- Test Results Column -->
-                            <div class="col-md-4">
-                                <h6 class="text-success">
-                                    <i class="fas fa-vial"></i> Test Results
-                                </h6>
-                                
-                                {% if entry.availability.wib_tests %}
-                                    <ul class="list-unstyled ml-3">
-                                        <li>
-                                            <a href="{{ url_for('tests_wibs', run=entry.run, trigger=entry.trigger) }}" 
-                                               class="text-decoration-none">
-                                                <i class="fas fa-vial"></i> TPC WIB Test Results
-                                            </a>
-                                        </li>
-                                    </ul>
-                                {% else %}
-                                    <p class="text-muted ml-3">
-                                        <i class="fas fa-exclamation-circle"></i> No WIB tests available
-                                    </p>
-                                {% endif %}
-                            </div>
-
-                            <!-- PDS Plots Column -->
-                            <div class="col-md-4">
-                                <h6 class="text-warning">
-                                    <i class="fas fa-chart-area"></i> PDS Plots
-                                </h6>
-                                
-                                {% if entry.availability.pds %}
-                                    <ul class="list-unstyled ml-3">
-                                        <li>
-                                            <a href="{{ url_for('pds', run=entry.run, trigger=entry.trigger) }}" 
-                                               class="text-decoration-none">
-                                                <i class="fas fa-chart-area"></i> PDS Plots
-                                            </a>
-                                        </li>
-                                    </ul>
-                                {% else %}
-                                    <p class="text-muted ml-3">
-                                        <i class="fas fa-exclamation-circle"></i> No PDS plots available
-                                    </p>
-                                {% endif %}
-                            </div>
-                            
-                        </div> <!-- End row -->
-                    </div> <!-- End card-body -->
-                </div> <!-- End collapse -->
-            </div> <!-- End card -->
+                            {% if loop.index % 3 == 0 %}
+                        </div>
+                        <div class="row">
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
             {% endfor %}
         </div>
 
-        <!-- Pagination Controls (Bottom) -->
+        <!-- Enhanced Pagination Controls (Bottom) -->
         <nav aria-label="Page navigation">
             <div class="d-flex justify-content-between align-items-center mt-4">
                 <div class="text-muted">
                     Page {{ current_page }} of {{ total_pages }}
                 </div>
                 <ul class="pagination mb-0">
+                    <!-- First Page -->
+                    {% if current_page > 1 %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1&per_page={{ per_page }}" title="First Page">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                        </li>
+                    {% endif %}
+                    
+                    <!-- Previous Page -->
                     {% if has_prev %}
                         <li class="page-item">
                             <a class="page-link" href="?page={{ prev_page }}&per_page={{ per_page }}">
@@ -163,6 +175,7 @@
                         </li>
                     {% endif %}
                     
+                    <!-- Page Numbers -->
                     {% for page_num in page_range %}
                         {% if page_num == current_page %}
                             <li class="page-item active">
@@ -177,6 +190,7 @@
                         {% endif %}
                     {% endfor %}
                     
+                    <!-- Next Page -->
                     {% if has_next %}
                         <li class="page-item">
                             <a class="page-link" href="?page={{ next_page }}&per_page={{ per_page }}">
@@ -188,6 +202,19 @@
                             <span class="page-link">
                                 Next <i class="fas fa-chevron-right"></i>
                             </span>
+                        </li>
+                    {% endif %}
+                    
+                    <!-- Last Page -->
+                    {% if current_page < total_pages %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ total_pages }}&per_page={{ per_page }}" title="Last Page">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
                         </li>
                     {% endif %}
                 </ul>
@@ -212,26 +239,62 @@
 function changePerPage(newPerPage) {
     const url = new URL(window.location);
     url.searchParams.set('per_page', newPerPage);
-    url.searchParams.set('page', '1');  // Reset to first page
+    url.searchParams.set('page', '1');
     window.location.href = url.toString();
 }
 
+function toggleRun(runId) {
+    const content = document.getElementById(`runContent${runId}`);
+    const icon = document.getElementById(`icon${runId}`);
+    
+    if (content.classList.contains('show')) {
+        content.classList.remove('show');
+        icon.style.transform = 'rotate(0deg)';
+    } else {
+        content.classList.add('show');
+        icon.style.transform = 'rotate(90deg)';
+    }
+}
+
+// Fast page loading optimization
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle chevron rotation for collapsible cards
-    document.querySelectorAll('[id^="collapse"]').forEach(function(collapseEl) {
-        const iconId = 'icon' + collapseEl.id.replace('collapse', '');
-        const icon = document.getElementById(iconId);
-        
-        if (icon) {
-            collapseEl.addEventListener('shown.bs.collapse', function() {
-                icon.style.transform = 'rotate(90deg)';
-            });
-            
-            collapseEl.addEventListener('hidden.bs.collapse', function() {
-                icon.style.transform = 'rotate(0deg)';
-            });
+    // Preload critical CSS if needed
+    const style = document.createElement('style');
+    style.textContent = `
+        .collapse { transition: none !important; }
+        .collapse.show { display: block !important; }
+    `;
+    document.head.appendChild(style);
+    
+    // Add keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    const prevLink = document.querySelector('a[href*="page={{ prev_page }}"]');
+                    if (prevLink) prevLink.click();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    const nextLink = document.querySelector('a[href*="page={{ next_page }}"]');
+                    if (nextLink) nextLink.click();
+                    break;
+            }
         }
     });
 });
 </script>
+
+<style>
+/* Performance optimizations */
+.card { will-change: transform; }
+.collapse { overflow: hidden; }
+.btn-group-sm .btn { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+.dropdown-menu { min-width: 120px; }
+
+/* Faster animations */
+.collapse { transition: height 0.2s ease !important; }
+</style>
+
 {% endblock %}
