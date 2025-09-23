@@ -19,7 +19,7 @@ class NaviagableDataframe:
     Wrapper object to simplify dataframe queries allowing for more natural next/prev operations
     '''
     def __init__(self, dataframe: pd.DataFrame):
-        dataframe.sort_values(list(dataframe.columns), inplace=True)
+        dataframe.sort_values(list(dataframe.columns), ascending=True, inplace=True)
         self._dataframe = dataframe
     
     
@@ -35,46 +35,54 @@ class NaviagableDataframe:
     
     def get_eq(self, **kwargs)->'pd.DataFrame':
         '''Check if values in dict are equal to kwargs'''
-        mask = pd.Series(True, index=self._dataframe.index)
-        print(kwargs)
-        
+        mask = pd.Series(True, index=self._dataframe.index)        
         
         for col, val in kwargs.items():
             mask &= self._dataframe[col] == int(val)  # "prev" means greater than for sorted ascending
         
-        print(mask)
         return self._dataframe[mask]
      
-    def get_prev(self, **kwargs)->Tuple[pd.DataFrame, Dict[str, int]] | Tuple[None, dict]:
+    def get_next(self, **kwargs)->Tuple[pd.DataFrame, Dict[str, int]] | Tuple[None, dict]:
         '''
         Get the prev row(s) from the one satisfying **kwargs
         '''
-        mask = pd.Series(True, index=self._dataframe.index)
-        for col, val in kwargs.items():
-            mask &= self._dataframe[col] > int(val)  # "prev" means greater than for sorted ascending
-        adj = self._dataframe[mask]
-        if adj.empty:
-            return None, {}
-        top = adj.iloc[0]
-        search_cond = {s: top[s] for s in kwargs.keys()}
-        return self.get_eq(**search_cond), search_cond
-    
-    def get_next(self, **kwargs)->Tuple[pd.DataFrame, Dict[str, int]] | Tuple[None, dict]:
+        cond = lambda k, v: self._dataframe[k] > v
+        return self._get_adjacent(cond, True, **kwargs)
+
+    def get_prev(self, **kwargs)->Tuple[pd.DataFrame, Dict[str, int]] | Tuple[None, dict]:
         '''
         Get the next row(s) from the one satisfying **kwargs
         '''
+        cond = lambda k, v: self._dataframe[k] < v
+        return self._get_adjacent(cond, False, **kwargs)
+
+    
+    def _get_adjacent(self, condition: Callable[[str, int], pd.Series], ascending: bool, **kwargs):
         mask = pd.Series(True, index=self._dataframe.index)
-        
-        for col, val in kwargs.items():
-            mask &= self._dataframe[col] < int(val)  # "prev" means greater than for sorted ascending
+        # We go back through the mask
+        mask_dict = {k: self._dataframe[k]==int(v) for k, v in kwargs.items()}
+        # Go backwards through dict
+        for k in reversed(mask_dict.keys()):
+            mask_dict[k] = condition(k, int(kwargs[k]))
+            m_copy = mask.copy()
+            for m in mask_dict.values():
+                m_copy &= m
+
+            if not self._dataframe[m_copy].empty:
+                mask = m_copy
+                break
 
         adj = self._dataframe[mask]
-        if adj.empty:
-            return None, {}
+        kwarg_list = list(kwargs.keys())
         
-        top = adj.iloc[0]
+        sort_adj = adj.sort_values(kwarg_list, inplace=False, ascending=ascending)
+
+        top = sort_adj.iloc[0]
         search_cond = {s: top[s] for s in kwargs.keys()}
         return self.get_eq(**search_cond), search_cond
+
+
+        
 
     def get_latest(self, merge_on = ['run', 'trigger'], **kwargs)->Tuple[pd.DataFrame, Dict[str, Any]] | Tuple[None, dict]:
         '''
@@ -82,7 +90,9 @@ class NaviagableDataframe:
         '''
         check_cols_in_db(self._dataframe, list(kwargs.keys()))
         
-        # Our dataframe is already ordered!
+        # Sort dataframe
+        self._dataframe.sort_values(merge_on+list(kwargs.keys()) , ascending=False, inplace=True)
+        
         cols = self.get_eq(**kwargs)
         if cols.empty:
             return None, {}
@@ -93,22 +103,6 @@ class NaviagableDataframe:
         # We also return the TOP values to ensure routing is done simply!
         return self.get_eq(**top_vals), top_vals
 
-    def _get_adjacent(self, cond, search_idx: int=0, **kwargs)->Tuple[pd.DataFrame, Dict[str, int]] | Tuple[None, dict]:
-        '''
-        Searches the element in a df satisfying a condition at search_idx
-        '''
-        adj = self.query_db_cond(cond, **kwargs)
-        
-        # Nothing!
-        if adj.empty:
-            return None, {}
-        
-        # Get top row
-        top = adj.iloc[search_idx]
-        
-        search_cond = {s: top[s] for s in kwargs.keys()}
-        # Now we get all rows satisfy the search cond
-        return self.get_eq(**search_cond), search_cond
 
 class DQMImageDatabase:
     '''

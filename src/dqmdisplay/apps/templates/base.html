@@ -143,6 +143,40 @@
 	.sidebar .nav-item:last-child {
 	    margin-right: 0; /* Remove margin from the last item if you want to avoid extra space at the end */
 	}
+
+        /* Navigation button styles */
+        .nav-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .nav-btn {
+            margin-left: 10px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .nav-btn:hover {
+            background-color: #0056b3;
+            color: white;
+            text-decoration: none;
+        }
+
+        .nav-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .nav-btn i {
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -192,6 +226,9 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('latest_pds') }}">PDS Plots</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('plot_navigator') }}">Navigator</a>
+                </li>
 
             </ul>
         </div>
@@ -201,8 +238,25 @@
         {% block content %}{% endblock %}
     </div>
 
+    <!-- Navigation buttons for pages that provide next/prev URLs -->
+    {% if prev_url or next_url %}
+    <div class="nav-buttons">
+        {% if prev_url %}
+            <a href="{{ prev_url }}" class="nav-btn" title="Previous">
+                <i class="fas fa-chevron-left"></i>Previous
+            </a>
+        {% endif %}
+        {% if next_url %}
+            <a href="{{ next_url }}" class="nav-btn" title="Next">
+                Next<i class="fas fa-chevron-right"></i>
+            </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Include Bootstrap JS and dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-</body>
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
