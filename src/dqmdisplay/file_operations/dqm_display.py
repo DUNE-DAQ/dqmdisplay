@@ -10,11 +10,11 @@ from dqmdisplay.file_operations.file_database import ImageExistsDatabase, DQMIma
 Collection of useful objects for DQM display. For now we'll hard code most of it
 '''
 
-class PlotAvailability(NamedTuple):
-    """Simple data structure to track what plots are available for a run/trigger"""
-    event_display: bool
-    wib_tests: bool  
-    pds: bool
+# class PlotAvailability(NamedTuple):
+#     """Simple data structure to track what plots are available for a run/trigger"""
+#     event_display: bool
+#     wib_tests: bool  
+#     pds: bool
 
 
 class AppManager():
@@ -140,17 +140,23 @@ class DQMDisplay:
     }
     MERGE_ON = ['run', 'trigger']
     
-    def __init__(self, base_directory: str | Path):
+    def __init__(self, base_directory: str | Path, config_dict: Optional[dict]=None):
         self._base_directory = Path(base_directory)
         
+        if config_dict is None:
+            self._config_dict = self.CONFIG_DICT
+        else:
+            self._config_dict = config_dict
+        
         db_list = []        
-        for name, opts in self.CONFIG_DICT.items():            
+        for name, opts in self._config_dict.items():            
             db = DQMImageDatabase(self._base_directory, opts.get('directory', ''),
                                   name, opts.get('regex'), opts.get('additional_cols', None))
             db_list.append(db)
             
         # Now we have our main lookup make the big database
         self._main_database = ImageExistsDatabase(db_list, self.MERGE_ON)
+    
         
     @property
     def database(self):
@@ -161,7 +167,7 @@ class DQMDisplay:
         Adds the image options for a single database
         '''
         
-        opts = self.CONFIG_DICT.get(db_name, None)
+        opts = self._config_dict.get(db_name, None)
         
         if opts is None:
             raise ValueError(f"Cannot find {db_name} in configuration")
@@ -208,24 +214,22 @@ class DQMDisplay:
         # Use groupby for better performance
         grouped = df.groupby(['run', 'trigger'])
         
-        for (run, trigger), group in grouped:
+        for (run, trigger), _ in grouped:
             run = int(run)
             trigger = int(trigger)
             
             if run not in run_trigger_data:
                 run_trigger_data[run] = {}
             
+            run_trigger_data[run][trigger] = {}
+            
             # Actually check if each plot type has data by looking at the specific columns
             # The database columns should contain boolean values or counts indicating availability
-            row = group.iloc[0]  # Get first (should be only) row for this run/trigger
-            
-            availability = PlotAvailability(
-                event_display=bool(row.get('event_display', 0)),
-                wib_tests=bool(row.get('tests_wibs', 0)), 
-                pds=bool(row.get('pds', 0))
-            )
-            
-            run_trigger_data[run][trigger] = availability
+
+            check = self._main_database.check_has_col(**{'run': run, 'trigger': trigger})
+
+            for n in self._main_database.database_names: 
+                run_trigger_data[run][trigger][n] = check[n]
         
         # Sort runs and triggers in descending order
         sorted_data = {}
@@ -299,7 +303,7 @@ class DQMDisplay:
         '''
         Slightly over complicated wrapper for dynamically generating flask app routes
         '''    
-        for db_name in self.CONFIG_DICT.keys():
+        for db_name in self._config_dict.keys():
             # Now we route      
             self.add_db_opt(app, db_name)      
         

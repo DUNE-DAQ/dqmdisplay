@@ -188,8 +188,9 @@ class ImageExistsDatabase:
         for d in merge_list[1:]:
             merged_df = merged_df.merge(d, on=merge_on, how='outer')
             
+        
         # Now we fill the NAs with false
-        merged_df[self.database_names] = merged_df[self.database_names].astype(bool).fillna(False)
+        merged_df[self.database_names] = merged_df[self.database_names].notna()
         self._merged_df = NaviagableDataframe(merged_df)
         
     def get_database(self, database_name: str):
@@ -205,14 +206,13 @@ class ImageExistsDatabase:
 
     def check_has_col(self, **kwargs):
         # Get the cols where condition is satisfied
-        cols = self._merged_df.get_eq(**kwargs)
-        
+        cols = self._merged_df.get_eq(**kwargs)        
         return_dict = {}
         
         for d in self._databases:
             if all(cols[d.name]):
-                return_dict[d.name] = d.dataframe.get_eq(**kwargs)
+                return_dict[d.name] = True
             else:
-                return_dict[d.name] = None                
+                return_dict[d.name] = False                
         
         return return_dict
