@@ -5,8 +5,9 @@ import pandas as pd
 from typing import List, Optional, Pattern, Tuple, Dict, Any
 import re
 from pathlib import Path
-from functools import lru_cache
 from dqmdisplay.utils.dict_tools import nested_group
+
+from tqdm import tqdm
 
 def check_cols_in_db(database: pd.DataFrame, col_list: List[str]):
     ''' Helper function for kwargs checking
@@ -298,7 +299,7 @@ class DQMImageDatabaseCollection :
         exists_data = []
 
         # Bit hacky, we'll loop over each row like this
-        for opts, _ in unique_combo_groups:
+        for opts, _ in tqdm(unique_combo_groups):
             opts_dict = {c: o for c, o in zip(col_label, opts)}
 
             opts_dict['exists'] = self.check_exists(**opts_dict)

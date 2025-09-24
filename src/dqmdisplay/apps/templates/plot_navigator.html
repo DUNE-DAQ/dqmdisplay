@@ -6,7 +6,7 @@
 <div class="container-fluid">
     <h1 class="mb-4">Plot Navigator</h1>
 
-    {% if page_entries %}
+    {% if run_summaries %}
         <!-- Pagination Controls (Top) -->
         <div class="row mb-3">
             <div class="col-md-6">
@@ -33,76 +33,32 @@
 
         <!-- Plot Entries -->
         <div class="plot-entries">
-            {% for run_data in page_entries %}
-            <div class="card mb-3">
+            {% for run_summary in run_summaries %}
+            <div class="card mb-3" id="run-card-{{ run_summary.run }}">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
-                            data-target="#collapse{{ run_data.run }}" aria-expanded="false" 
-                            aria-controls="collapse{{ run_data.run }}"
-                            onclick="toggleIcon({{ run_data.run }})">
-                            <i class="fas fa-chevron-right" id="icon{{ run_data.run }}"></i>
-                            Run {{ run_data.run }} ({{ run_data.triggers|length }} triggers)
+                        <button class="btn btn-link btn-block text-left collapsed" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#collapse{{ run_summary.run }}" 
+                                aria-expanded="false" aria-controls="collapse{{ run_summary.run }}"
+                                onclick="toggleRunExpansion({{ run_summary.run }})">
+                            <i class="fas fa-chevron-right transition-icon" id="icon{{ run_summary.run }}"></i>
+                            Run {{ run_summary.run }} 
+                            <span class="badge bg-primary ms-2">{{ run_summary.trigger_count }} triggers</span>
+                            <span class="badge bg-success ms-1">{{ run_summary.plot_count }} plots</span>
                         </button>
                     </h5>
                 </div>
-                <div id="collapse{{ run_data.run }}" class="collapse">
+                <div id="collapse{{ run_summary.run }}" class="collapse" data-run="{{ run_summary.run }}">
                     <div class="card-body">
-                        {% for trigger_data in run_data.triggers %}
-                        <div class="row mb-4 border-bottom pb-3">
-                            <div class="col-md-12">
-                                <h6 class="text-primary mb-3">
-                                    <i class="fas fa-play-circle"></i> Trigger {{ trigger_data.trigger }}
-                                </h6>
+                        <div class="text-center py-3" id="loading{{ run_summary.run }}">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
-                            
-                            <div class="row">
-                                {% for display_name, display_info in display_config.items() %}
-                                <div class="col-md-{{ 12 // display_config|length }}">
-                                    <h6 class="text-{{ display_info.color }}">
-                                        <i class="fas fa-{{ display_info.icon }}"></i> {{ display_info.title }}
-                                    </h6>
-                                    
-                                    {% set availability = trigger_data.availability.get(display_name, False) %}
-                                    
-                                    {% if availability %}
-                                        <ul class="list-unstyled ml-3">
-                                            {% for view_name, view_info in display_info.views.items() %}
-                                                {% if view_info.get('has_sub_options', False) %}
-                                                    <!-- Handle views with sub-options (like element_id, plane) -->
-                                                    {% if availability is mapping %}
-                                                        {% for sub_option, is_available in availability.items() %}
-                                                            {% if is_available %}
-                                                                <li>
-                                                                    <a href="{{ url_for(view_name, run=run_data.run, trigger=trigger_data.trigger, **{view_info.sub_param: sub_option}) }}" class="text-decoration-none">
-                                                                        <i class="fas fa-{{ view_info.icon }}"></i> {{ view_info.title.format(sub_option=sub_option) }}
-                                                                    </a>
-                                                                </li>
-                                                            {% endif %}
-                                                        {% endfor %}
-                                                    {% endif %}
-                                                {% else %}
-                                                    <!-- Handle simple boolean availability -->
-                                                    {% if availability == True %}
-                                                        <li>
-                                                            <a href="{{ url_for(view_name, run=run_data.run, trigger=trigger_data.trigger) }}" class="text-decoration-none">
-                                                                <i class="fas fa-{{ view_info.icon }}"></i> {{ view_info.title }}
-                                                            </a>
-                                                        </li>
-                                                    {% endif %}
-                                                {% endif %}
-                                            {% endfor %}
-                                        </ul>
-                                    {% else %}
-                                        <p class="text-muted ml-3">
-                                            <i class="fas fa-exclamation-circle"></i> No {{ display_info.title.lower() }} available
-                                        </p>
-                                    {% endif %}
-                                </div>
-                                {% endfor %}
-                            </div>
+                            <div class="mt-2 text-muted">Loading triggers...</div>
                         </div>
-                        {% endfor %}
+                        <div id="triggers{{ run_summary.run }}" class="d-none">
+                            <!-- Triggers will be loaded here via AJAX -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -205,6 +161,10 @@
 </div> <!-- End container -->
 
 <script>
+// Global state to track loaded runs and prevent duplicate requests
+const loadedRuns = new Set();
+const loadingRuns = new Set();
+
 function changePerPage(newPerPage) {
     const url = new URL(window.location);
     url.searchParams.set('per_page', newPerPage);
@@ -212,47 +172,183 @@ function changePerPage(newPerPage) {
     window.location.href = url.toString();
 }
 
-function toggleIcon(runId) {
+async function toggleRunExpansion(runId) {
+    const collapseEl = document.getElementById(`collapse${runId}`);
     const icon = document.getElementById(`icon${runId}`);
-    const collapse = document.getElementById(`collapse${runId}`);
     
-    if (icon && collapse) {
-        // Use Bootstrap's collapse events for smooth animation
-        collapse.addEventListener('shown.bs.collapse', function() {
-            icon.style.transform = 'rotate(90deg)';
-            icon.style.transition = 'transform 0.2s ease';
-        }, { once: true });
+    // Handle icon rotation
+    if (collapseEl.classList.contains('show')) {
+        icon.style.transform = 'rotate(0deg)';
+    } else {
+        icon.style.transform = 'rotate(90deg)';
         
-        collapse.addEventListener('hidden.bs.collapse', function() {
-            icon.style.transform = 'rotate(0deg)';
-            icon.style.transition = 'transform 0.2s ease';
-        }, { once: true });
+        // Load triggers if not already loaded
+        if (!loadedRuns.has(runId) && !loadingRuns.has(runId)) {
+            await loadTriggers(runId);
+        }
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize icon transitions for all collapsible cards
-    document.querySelectorAll('[id^="collapse"]').forEach(function(collapseEl) {
-        const runId = collapseEl.id.replace('collapse', '');
-        const icon = document.getElementById(`icon${runId}`);
+async function loadTriggers(runId) {
+    if (loadingRuns.has(runId) || loadedRuns.has(runId)) {
+        return;
+    }
+    
+    loadingRuns.add(runId);
+    
+    try {
+        const response = await fetch(`/navigator/triggers/${runId}`);
+        const data = await response.json();
         
-        if (icon) {
-            // Set initial transition style
-            icon.style.transition = 'transform 0.2s ease';
+        if (data.success) {
+            renderTriggers(runId, data.triggers);
+            loadedRuns.add(runId);
+        } else {
+            showError(runId, data.error || 'Failed to load triggers');
+        }
+    } catch (error) {
+        showError(runId, 'Network error loading triggers');
+    } finally {
+        loadingRuns.delete(runId);
+        // Hide loading spinner
+        document.getElementById(`loading${runId}`).classList.add('d-none');
+        document.getElementById(`triggers${runId}`).classList.remove('d-none');
+    }
+}
+
+function renderTriggers(runId, triggers) {
+    const triggersContainer = document.getElementById(`triggers${runId}`);
+    
+    if (triggers.length === 0) {
+        triggersContainer.innerHTML = '<div class="text-muted text-center py-3">No triggers available</div>';
+        return;
+    }
+    
+    let html = '';
+    triggers.forEach(trigger => {
+        html += `
+            <div class="card mb-3 trigger-card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <button class="btn btn-link btn-sm collapsed" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#triggerCollapse${runId}_${trigger.trigger}" 
+                                aria-expanded="false" aria-controls="triggerCollapse${runId}_${trigger.trigger}"
+                                onclick="toggleTriggerIcon(${runId}, ${trigger.trigger})">
+                            <i class="fas fa-chevron-right transition-icon" id="triggerIcon${runId}_${trigger.trigger}"></i>
+                            Trigger ${trigger.trigger}
+                            <span class="badge bg-info ms-2">${trigger.plot_count} plots</span>
+                        </button>
+                    </h6>
+                </div>
+                <div id="triggerCollapse${runId}_${trigger.trigger}" class="collapse">
+                    <div class="card-body">
+        `;
+        
+        if (trigger.plots.length > 0) {
+            const plotsByDisplay = {};
+            trigger.plots.forEach(plot => {
+                if (!plotsByDisplay[plot.display]) {
+                    plotsByDisplay[plot.display] = [];
+                }
+                plotsByDisplay[plot.display].push(plot);
+            });
+            
+            Object.keys(plotsByDisplay).forEach(displayName => {
+                html += `<div class="mb-3">
+                    <h6 class="text-primary"><i class="fas fa-chart-bar"></i> ${displayName}</h6>
+                    <ul class="list-unstyled ms-3">`;
+                
+                plotsByDisplay[displayName].forEach(plot => {
+                    const params = new URLSearchParams(plot.url_params).toString();
+                    html += `
+                        <li class="mb-1">
+                            <a href="/${plot.view_name}?${params}" class="text-decoration-none plot-link">
+                                <i class="fas fa-external-link-alt me-1"></i>${plot.title}
+                            </a>
+                        </li>`;
+                });
+                
+                html += '</ul></div>';
+            });
+        } else {
+            html += '<div class="text-muted">No plots available for this trigger</div>';
+        }
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    triggersContainer.innerHTML = html;
+}
+
+function toggleTriggerIcon(runId, triggerId) {
+    const icon = document.getElementById(`triggerIcon${runId}_${triggerId}`);
+    const collapse = document.getElementById(`triggerCollapse${runId}_${triggerId}`);
+    
+    if (collapse.classList.contains('show')) {
+        icon.style.transform = 'rotate(0deg)';
+    } else {
+        icon.style.transform = 'rotate(90deg)';
+    }
+}
+
+function showError(runId, error) {
+    const triggersContainer = document.getElementById(`triggers${runId}`);
+    triggersContainer.innerHTML = `
+        <div class="alert alert-danger" role="alert">
+            <i class="fas fa-exclamation-triangle"></i> Error loading triggers: ${error}
+        </div>`;
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up icon transitions
+    document.querySelectorAll('.transition-icon').forEach(icon => {
+        icon.style.transition = 'transform 0.2s ease';
+    });
+    
+    // Handle collapse events for smooth icon animations
+    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(button => {
+        const target = button.getAttribute('data-bs-target');
+        if (target) {
+            const collapseEl = document.querySelector(target);
+            if (collapseEl) {
+                collapseEl.addEventListener('show.bs.collapse', () => {
+                    const icon = button.querySelector('.transition-icon');
+                    if (icon) icon.style.transform = 'rotate(90deg)';
+                });
+                
+                collapseEl.addEventListener('hide.bs.collapse', () => {
+                    const icon = button.querySelector('.transition-icon');
+                    if (icon) icon.style.transform = 'rotate(0deg)';
+                });
+            }
         }
     });
 });
 </script>
 
 <style>
-/* Enhanced styling for better usability */
+/* Enhanced styling for better usability and performance */
 .plot-entries .card {
     border: 1px solid #dee2e6;
-    transition: box-shadow 0.2s ease;
+    transition: box-shadow 0.15s ease;
 }
 
 .plot-entries .card:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.trigger-card {
+    border: 1px solid #e9ecef !important;
+    box-shadow: none !important;
+}
+
+.trigger-card:hover {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
 }
 
 .collapse {
@@ -275,21 +371,32 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* Icon animations */
-.fas {
+.transition-icon {
     transition: transform 0.2s ease;
     margin-right: 8px;
 }
 
 /* Better link styling */
-.list-unstyled a {
+.plot-link {
     display: inline-block;
     padding: 2px 0;
     transition: color 0.2s ease;
 }
 
-.list-unstyled a:hover {
+.plot-link:hover {
     color: #0056b3 !important;
     text-decoration: none;
+}
+
+/* Loading spinner improvements */
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* Badge improvements */
+.badge {
+    font-size: 0.7em;
 }
 
 /* Pagination improvements */
@@ -325,15 +432,10 @@ document.addEventListener('DOMContentLoaded', function() {
     .btn-link {
         font-size: 0.9rem;
     }
-}
-
-/* Better visual separation */
-.border-bottom {
-    border-bottom: 1px solid #e9ecef !important;
-}
-
-.pb-3 {
-    padding-bottom: 1rem !important;
+    
+    .badge {
+        font-size: 0.6em;
+    }
 }
 
 /* Performance optimizations */
@@ -343,6 +445,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .container-fluid {
     will-change: scroll-position;
+}
+
+/* Visual improvements */
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+/* Ensure proper nesting */
+.trigger-card .card-header {
+    background-color: #f1f3f4;
+}
+
+/* Loading state improvements */
+.d-none {
+    display: none !important;
 }
 </style>
 
