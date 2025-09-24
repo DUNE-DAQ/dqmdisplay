@@ -1,20 +1,26 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 from pathlib import Path
+
 
 @dataclass
 class ViewData:
     html: str
-    cols_to_search: List[str] = []
+    # Use American spelling cos HTML...
+    title: str
+    cols_to_search: List[str] = field(default_factory=lambda: [])
     name: str = "default"
+
 
 @dataclass
 class DisplayData:
+    # Display data
     name: str
     subdirectory: Path | str
     regex: str
-    views: List[ViewData]
-    all_columns_to_show: List[str] = ['run', 'trigger']
+    views: list
+    title: str
+    all_columns_to_show: List[str] = field(default_factory=lambda: ['run', 'trigger'])
  
  
 '''
@@ -33,21 +39,25 @@ class DisplayConfig():
                         _plane(?P<plane>\d+)\.png$""",
             # Additional columns to add
             'all_columns_to_show': ['element_id', 'plane'],
-            
+            'title': 'Event Displays',
             
             # Other views {view_name: options to add} (does nothing rn, this is hardcoded later...)
             'views':  {
                             'event_display': {
                                 'cols_to_search': ['element_id'],
-                                'html': 'event_display.html'
+                                'html': 'event_display.html',
+                                'title': 'APA/CRP {sub_option} Display'
+                                
                             },
                             'grid': {
                                 'cols_to_search': ['element_id'],
-                                'html': 'event_display_grid.html'    
+                                'html': 'event_display_grid.html', 
+                                'title': 'APA/CRP {sub_option} Grid'
                             },
                              'plane': {
                                 'cols_to_search': ['plane'],
-                                'html': 'event_display_plane.html'
+                                'html': 'event_display_plane.html',
+                                'title': 'Plane {sub_option} Grid'
                             }
             }
         },
@@ -55,20 +65,24 @@ class DisplayConfig():
             'directory': 'pds_plots',
             'regex': r"run(?P<run>\d+)_(?P<trigger>\d+)_([^_]+)\.svg",
             'views': {
-                'pds_plots': {
-                        'html': 'pds.html'
+                'pds': {
+                        'html': 'pds.html',
+                        'title': 'PDS Plots'
                 }
-            }
+            },
+            'title': 'PDS'
         },
         'tests_wibs': {
             'directory': 'WIBTests',
             'regex': r"Tests_WIBS_results_run(?P<run>\d+)_trigger(?P<trigger>\d+)\.[^.]+",
             'views': {
                 'tests_wibs': {
-                    'html': 'tests_wibs.html'
+                    'html': 'tests_wibs.html',
+                    'title': 'TPC WIB Test Results'
                 }
-            }
-        }
+            },
+           'title': 'WIB Tests'
+        },
     }
 
     def __init__(self, config: Optional[dict]=None, common_columns = ['run', 'trigger']):
@@ -107,7 +121,8 @@ class DisplayConfig():
                 subdirectory=disp_opts.get('directory', '',),
                 views=views_list,
                 all_columns_to_show=cols_to_show,
-                regex=disp_opts.get('regex', "")
+                regex=disp_opts.get('regex', ""),
+                title=disp_opts.get('title', disp_name)
             )
             
             self._display_configs.append(disp_data)
@@ -118,20 +133,17 @@ class DisplayConfig():
         '''Make list of views '''
         views_list = []
         
-        if 'default' not in list(views.keys()):
-            raise ValueError("Default view must be provided!")
-
         for view_name, view_opts in views.items():
 
             # Convert to the display name            
             view_data = ViewData(
                 name=view_name,
                 html=view_opts.get('html',""),
-                cols_to_search=view_opts.get('cols_to_search', [])
+                cols_to_search=view_opts.get('cols_to_search', []),
+                title = view_opts.get('title', view_name)
             )
 
             views_list.append(view_data)
-        
         return views_list
 
     @property
