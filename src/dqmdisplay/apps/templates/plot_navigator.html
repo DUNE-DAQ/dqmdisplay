@@ -6,6 +6,28 @@
 <div class="container-fluid">
     <h1 class="mb-4">Plot Navigator</h1>
 
+    <!-- Pass trigger data to JavaScript -->
+    <script>
+    window.triggerData = {
+        {% for run_data in page_entries %}
+        {{ run_data.run }}: {
+            "triggers": [
+                {% for trigger_data in run_data.triggers %}
+                {
+                    "trigger": {{ trigger_data.trigger }},
+                    "availability": {
+                        "event_display": {{ trigger_data.availability.event_display|tojson }},
+                        "tests_wibs": {{ trigger_data.availability.tests_wibs|tojson }},
+                        "pds": {{ trigger_data.availability.pds|tojson }}
+                    }
+                }{{ "," if not loop.last }}
+                {% endfor %}
+            ]
+        }{{ "," if not loop.last }}
+        {% endfor %}
+    };
+    </script>
+
     {% if page_entries %}
         <!-- Pagination Controls (Top) -->
         <div class="row mb-3">
@@ -204,15 +226,81 @@ function loadTriggers(runId) {
             
             // Element Display Links
             for (let ele_no = 1; ele_no <= 5; ele_no++) {
-                html += `<li><a href="/event_display/${runId}/${trigger.trigger}/${ele_no}" class="text-decoration-none">
+                html += `<li><a href="/event_display/run:${runId}/trigger:${trigger.trigger}/element_id:${ele_no}" class="text-decoration-none">
                            <i class="fas fa-chart-line"></i> APA/CRP ${ele_no} Display</a></li>
-                         <li><a href="/event_display_grid/${runId}/${trigger.trigger}/${ele_no}" class="text-decoration-none">
+                         <li><a href="/event_display_grid/run:${runId}/trigger:${trigger.trigger}/element_id:${ele_no}" class="text-decoration-none">
                            <i class="fas fa-th"></i> APA/CRP ${ele_no} Grid</a></li>`;
             }
             
             // Plane Display Links
             for (let plane_no = 0; plane_no <= 2; plane_no++) {
-                html += `<li><a href="/event_display_plane/${run
+                html += `<li><a href="/event_display_plane/run:${runId}/trigger:${trigger.trigger}/plane:${plane_no}" class="text-decoration-none">
+                           <i class="fas fa-layer-group"></i> Plane ${plane_no} Grid</a></li>`;
+            }
+            
+            html += '</ul>';
+        } else {
+            html += '<p class="text-muted ml-3"><i class="fas fa-exclamation-circle"></i> No event displays available</p>';
+        }
+        
+        html += `</div>
+                 <!-- Test Results Column -->
+                 <div class="col-md-4">
+                     <h6 class="text-success">
+                         <i class="fas fa-vial"></i> Test Results
+                     </h6>`;
+        
+        if (trigger.availability.tests_wibs) {
+            html += `<ul class="list-unstyled ml-3">
+                       <li><a href="/tests_wibs/run:${runId}/trigger:${trigger.trigger}" class="text-decoration-none">
+                         <i class="fas fa-vial"></i> TPC WIB Test Results</a></li>
+                     </ul>`;
+        } else {
+            html += '<p class="text-muted ml-3"><i class="fas fa-exclamation-circle"></i> No WIB tests available</p>';
+        }
+        
+        html += `</div>
+                 <!-- PDS Plots Column -->
+                 <div class="col-md-4">
+                     <h6 class="text-warning">
+                         <i class="fas fa-chart-area"></i> PDS Plots
+                     </h6>`;
+        
+        if (trigger.availability.pds) {
+            html += `<ul class="list-unstyled ml-3">
+                       <li><a href="/pds/run:${runId}/trigger:${trigger.trigger}" class="text-decoration-none">
+                         <i class="fas fa-chart-area"></i> PDS Plots</a></li>
+                     </ul>`;
+        } else {
+            html += '<p class="text-muted ml-3"><i class="fas fa-exclamation-circle"></i> No PDS plots available</p>';
+        }
+        
+        html += '</div></div><hr>';
+    });
+    
+    // Update the triggers div
+    triggersDiv.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle chevron rotation for collapsible cards
+    document.querySelectorAll('[id^="collapse"]').forEach(function(collapseEl) {
+        const runId = collapseEl.id.replace('collapse', '');
+        const icon = document.getElementById(`icon${runId}`);
+        
+        if (icon) {
+            collapseEl.addEventListener('shown.bs.collapse', function() {
+                icon.style.transform = 'rotate(90deg)';
+                icon.style.transition = 'transform 0.2s ease';
+            });
+            
+            collapseEl.addEventListener('hidden.bs.collapse', function() {
+                icon.style.transform = 'rotate(0deg)';
+                icon.style.transition = 'transform 0.2s ease';
+            });
+        }
+    });
+});
 </script>
 
 <style>
