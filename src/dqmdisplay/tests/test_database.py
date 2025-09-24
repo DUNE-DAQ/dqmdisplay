@@ -3,7 +3,7 @@ import pandas as pd
 
 import pytest
 
-from dqmdisplay.file_operations.file_database import NaviagableDataframe, DQMImageDatabase, ImageExistsDatabase
+from dqmdisplay.file_operations.file_database import NavigableDataframe, DQMImageDatabase, DQMImageDatabaseCollection
 
 # make runs
 N_ENTRIES = 10
@@ -19,13 +19,21 @@ files = [f"file_name_{i}" for i in range(N_ENTRIES*N_GROUPS)]
 
 TEST_DATA = pd.DataFrame({'run': runs, 'trigger': triggers, 'files': files})
 
+A_RUNS = [1, 2, 3]
+A_ELEMENTS = [1,2,3]
+A_TRIGGERS = [1, 2, 3]
+A_REGEX=r"A_run(?P<run>\d+)_trigger(?P<trigger>\d+)_element_id(?P<element_id>\d+).png"
+
+B_RUNS = [1, 4, 5]
+B_TRIGGERS = [3, 4, 5]
+B_REGEX=r"B_run(?P<run>\d+)_trigger(?P<trigger>\d+).png"
 
 def test_navigable_dataframe_basic():
     '''
     Test if the navigation features are set up correctly 
     '''
     
-    navigable = NaviagableDataframe(TEST_DATA)
+    navigable = NavigableDataframe(TEST_DATA)
     
     assert not navigable.as_dataframe().empty, "No data frame has been set!"
     
@@ -57,7 +65,7 @@ def test_navigable_dataframe_next_prev():
     '''
     Test if the dataframe is correctly set up to go backwards/forwards
     '''
-    navigable = NaviagableDataframe(TEST_DATA)
+    navigable = NavigableDataframe(TEST_DATA)
 
     # Now we test navigation
     current_file_vals = {'run': 2, 'trigger': 2}
@@ -86,15 +94,14 @@ def dummy_file_maker(tmp_path_factory):
     a = tmp_path_factory.mktemp("test_files_a")
     b = tmp_path_factory.mktemp("test_files_b")
     # We'll make some dummy event displays
-    a_runs = [1, 2, 3]
-    b_runs = [1, 4, 5]
-    a_triggers = [1, 2, 3]
-    b_triggers = [3, 4, 5]
+    
+    
 
-    for ar, br in zip(a_runs, b_runs):
-        for at, bt in zip(a_triggers, b_triggers):
-            (a / f"A_run{ar}_trigger{at}.png").touch()
+    for ar, br in zip(A_RUNS, B_RUNS):
+        for at, bt in zip(A_TRIGGERS, B_TRIGGERS):
             (b / f"B_run{br}_trigger{bt}.png").touch()
+            for ae in A_ELEMENTS:
+                (a / f"A_run{ar}_trigger{at}_element_id{ae}.png").touch()
 
     return a, b
 
@@ -104,30 +111,79 @@ def test_image_database(dummy_file_maker):
 
     database = DQMImageDatabase(file_dir.parent, file_dir.name,
                                 "my_database",
-                                r"A_run(?P<run>\d+)_trigger(?P<trigger>\d+).png"
+                                A_REGEX,
+                                additional_elements=['element_id']
                                 )
     # Check naming
     assert database.name == "my_database"
-    
     # Check the file names are correct
-    assert database.dataframe.get_eq(**{'run': 1, 'trigger': 1})[database.name].to_list()[0].name == 'A_run1_trigger1.png'
+    searched =  database.get_eq(**{'run': 1, 'trigger': 1})
+    searched = searched.sort_values('element_id')
+
+    comp_list = [s.name for s in searched['my_database'].to_list()]    
+    assert comp_list == [f'A_run1_trigger1_element_id{i}.png' for i in A_ELEMENTS]
+
+    # Now we wanna see if we can also get the element ids correct!
+    searched =  database.get_next(**{'run': 1, 'trigger': 1})
     
-def test_image_exists_database(dummy_file_maker):
+def test_image_database_collection(dummy_file_maker):
+    '''Tests for multi-image db'''
     file_a, file_b = dummy_file_maker
     
     database_a = DQMImageDatabase(file_a.parent, file_a.name,
                             "my_database_a",
-                            r"A_run(?P<run>\d+)_trigger(?P<trigger>\d+).png"
+                            A_REGEX,
+                            additional_elements=['element_id']
                             )
 
 
     database_b = DQMImageDatabase(file_b.parent, file_b.name,
                             "my_database_b",
-                            r"B_run(?P<run>\d+)_trigger(?P<trigger>\d+).png"
+                            B_REGEX,
                             )
     
-    image_exists_db = ImageExistsDatabase([database_a, database_b])
+    image_collection = DQMImageDatabaseCollection()
+    image_collection.add_display(database_a)
+    image_collection.add_display(database_b)
     
-    check_db = image_exists_db.check_has_col(**{'run': 1, 'trigger': 2})    
-    assert check_db['my_database_a']
-    assert not check_db['my_database_b']
+    image_collection.add_view("my_database_a", "my_database_a")
+    image_collection.add_view("my_database_b", "my_database_b")
+    image_collection.add_view("my_database_a_element", "my_database_a", "element_id")
+    
+    test_disp = { 
+                    'my_database_a': 
+                    {
+                        'display_name': "my_database_a",
+                        'page_col_name': None,
+                        'page_col_indices': None
+                    },
+                    'my_database_b': 
+                    {
+                        'display_name': "my_database_b",
+                        'page_col_name': None,
+                        'page_col_indices': None
+                    },
+                    'my_database_a_element': 
+                    {
+                        'display_name': "my_database_a",
+                        'page_col_name': 'element_id',
+                        'page_col_indices': A_ELEMENTS
+                    },
+                }
+    
+    for name, opts in test_disp.items():
+        d = image_collection._views.get(name, None)
+        # Check this is there
+        assert d is not None
+        
+        for opt_d, opt_test in zip(d.values(), opts.values()):
+            if isinstance(opt_d, list) or isinstance(opt_test, list):
+                assert not set(opt_d).difference(opt_test)
+            else:
+                assert opt_d == opt_test
+    
+    # Now we want to see if it exists
+    exist_check = image_collection.check_exists(**{'run': 2, 'trigger': 1})    
+    assert exist_check == {'my_database_a': True, 'my_database_b': False, 'my_database_a_element': {3: True, 2: True, 1: True}}
+    
+    print(image_collection.get_unique_as_dict(['run', 'trigger']))

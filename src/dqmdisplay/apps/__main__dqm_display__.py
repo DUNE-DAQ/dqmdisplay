@@ -2,7 +2,7 @@ from pathlib import Path
 
 from flask import Flask, send_from_directory, render_template 
 
-from dqmdisplay.file_operations.dqm_display import DQMDisplay
+from dqmdisplay.file_operations.dqm_display import DQMDisplayApp
 
 app = Flask(__name__)
 
@@ -34,7 +34,7 @@ def main(image_dir, port):
     global IMAGE_DIRECTORY
 
     IMAGE_DIRECTORY = image_dir
-    db = DQMDisplay(IMAGE_DIRECTORY)
+    db = DQMDisplayApp(IMAGE_DIRECTORY)
     db.link_app(app)
     
     
