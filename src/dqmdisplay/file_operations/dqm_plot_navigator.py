@@ -18,11 +18,12 @@ class DQMPlotNavigator:
         self._config = config
         self._template_name = template_name
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=128)  # Increase cache size for run-specific data
     def _get_plot_data(self):
         """Get cached plot data from the database collection"""
         return self._database_collection.get_unique_as_dict(self._config.common_columns)
 
+    @lru_cache(maxsize=1)
     def _get_display_config(self) -> Dict[str, Any]:
         """Generate display configuration for the navigator template"""
         display_config = {}
@@ -67,6 +68,35 @@ class DQMPlotNavigator:
             per_page = 20
             
         return page, per_page, per_page_options
+
+    @lru_cache(maxsize=1)
+    def _get_run_summaries_fast(self) -> List[Dict]:
+        """Get run summaries without computing full existence data - much faster"""
+        # Just get unique combinations without existence checks
+        unique_combos = self._database_collection.get_unique_cols_all_db(self._config.common_columns)
+        
+        if unique_combos.empty:
+            return []
+            
+        # Group by run and count triggers
+        run_groups = unique_combos.groupby('run')
+        run_summaries = []
+        
+        for run, group in run_groups:
+            trigger_count = len(group)
+            # Estimate plot count based on triggers and available displays
+            # This is faster than computing exact existence
+            estimated_plots = trigger_count * len(self._config.displays_list)
+            
+            run_summaries.append({
+                'run': run,
+                'trigger_count': trigger_count,
+                'plot_count': estimated_plots  # Rough estimate for speed
+            })
+        
+        # Sort runs in descending order
+        run_summaries.sort(key=lambda x: x['run'], reverse=True)
+        return run_summaries
 
     def _build_run_summary(self, run_trigger_data: Dict) -> List[Dict]:
         """Build run summary data for lazy loading"""
@@ -202,20 +232,19 @@ class DQMPlotNavigator:
         # Get pagination parameters
         page, per_page, per_page_options = self._get_pagination_params()
         
-        # Get cached data
-        run_trigger_data = self._get_plot_data()
+        # Use fast summary instead of full data for initial load
+        try:
+            all_run_summaries = self._get_run_summaries_fast()
+        except (AttributeError, KeyError, ValueError):
+            # Fallback to slow method if fast method fails
+            run_trigger_data = self._get_plot_data()
+            if not run_trigger_data:
+                return render_template(self._template_name, 
+                                     run_summaries=[],
+                                     display_config={},
+                                     **self._calculate_pagination_info(1, 0, per_page))
+            all_run_summaries = self._build_run_summary(run_trigger_data)
         
-        if not run_trigger_data:
-            return render_template(self._template_name, 
-                                 run_summaries=[],
-                                 display_config={},
-                                 **self._calculate_pagination_info(1, 0, per_page))
-        
-        # Generate display configuration dynamically
-        display_config = self._get_display_config()
-        
-        # Build run summaries for pagination
-        all_run_summaries = self._build_run_summary(run_trigger_data)
         total_entries = len(all_run_summaries)
         
         # Calculate pagination
@@ -225,6 +254,9 @@ class DQMPlotNavigator:
         start_idx = (pagination_info['current_page'] - 1) * per_page
         end_idx = start_idx + per_page
         current_page_summaries = all_run_summaries[start_idx:end_idx]
+        
+        # Generate display configuration dynamically
+        display_config = self._get_display_config()
         
         return render_template(self._template_name, 
                               run_summaries=current_page_summaries,
@@ -240,5 +272,7 @@ class DQMPlotNavigator:
                         self.get_trigger_data)
 
     def invalidate_cache(self):
-        """Invalidate the cached plot data (useful when data changes)"""
+        """Invalidate all cached data (useful when data changes)"""
         self._get_plot_data.cache_clear()
+        self._get_run_summaries_fast.cache_clear()
+        self._get_display_config.cache_clear()
