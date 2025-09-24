@@ -72,13 +72,15 @@ class AppManager():
         next_url = None
         prev_url = None
 
-        if next_args:
+        current_det = {k: v for k, v in vals.items() if k in self._additional_columnn_list}
+
+        if next_args and not self._database.get_eq(**current_det, **next_args).empty:
             # Merge the navigation args with current path-specific args
             next_kwargs = {**{k: v for k, v in vals.items() if k in self._additional_columnn_list}, **next_args}
             next_url = url_for(self.page_name(), **next_kwargs)
 
 
-        if prev_args:
+        if prev_args and not self._database.get_eq(**current_det, **prev_args).empty:
             prev_kwargs = {**{k: v for k, v in vals.items() if k in self._additional_columnn_list}, **prev_args}
             prev_url = url_for(self.page_name(), **prev_kwargs)
 
