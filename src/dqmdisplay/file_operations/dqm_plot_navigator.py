@@ -1,6 +1,5 @@
 from flask import Flask, render_template, jsonify, url_for
 from typing import Dict, Any
-import pandas as pd
 import logging
 from dqmdisplay.file_operations.file_database import DQMImageDatabaseCollection
 from dqmdisplay.file_operations.dqm_config import DisplayConfig
@@ -61,55 +60,35 @@ class DQMPlotNavigator:
         return display_name
 
     def add_to_app(self, app: Flask):
-        # Main navigator page
         app.add_url_rule('/plot_navigator', 'plot_navigator', self.render_navigator_page)
-
-        # JSON endpoints for lazy loading
         app.add_url_rule('/plot_navigator_runs', 'plot_navigator_runs', self.get_runs_json)
         app.add_url_rule('/plot_navigator_triggers/<int:run>', 'plot_navigator_triggers', self.get_triggers_json)
 
     # -----------------------------
-    # JSON endpoints for AJAX
+    # JSON endpoints
     # -----------------------------
     def get_runs_json(self):
-        """Return a list of runs"""
         df_runs = self.database_collection.get_unique_cols_all_db(['run'])
         sorted_runs = sorted(df_runs['run'], reverse=True)
         return jsonify({"runs": sorted_runs})
 
     def get_triggers_json(self, run: int):
-        """Return triggers and plots for a given run, handling extra columns correctly"""
+        '''
+        HW: Please re-write this I gave up here and got an LLM to do this :')
+        '''
         df = self.database_collection.get_existing_combos()
-        
         df_run = df[df['run'] == run]
-
         triggers_data = []
 
-        # Group by trigger
         for trigger, trigger_group in df_run.groupby('trigger'):
             plots = []
-
-            # Further group by view_name to handle multiple extra column values
             for view_name, view_group in trigger_group.groupby('view_name'):
                 opts = self.database_collection.get_view(view_name)
                 col_name = opts.get("page_col_name")
+                unique_vals = view_group[col_name].unique() if col_name else [None]
 
-                # If there's an extra column, get all unique values; else just [None]
-                if col_name:
-                    unique_vals = view_group[col_name].unique()
-                else:
-                    unique_vals = [None]
-
-                # Build plot entries for each unique extra value
                 for val in unique_vals:
-                    extra_params = {}
-                    if col_name:
-                        # Convert to int if possible
-                        if isinstance(val, (pd.Series, pd.Index)):
-                            val = val.item()
-                        extra_params[col_name] = int(val)
-
-                    # Build URL safely
+                    extra_params = {col_name: int(val)} if col_name else {}
                     try:
                         plot_url = url_for(
                             self.route_makers[view_name].page_name(),
@@ -128,19 +107,14 @@ class DQMPlotNavigator:
                     })
 
             triggers_data.append({
-                "trigger": int(trigger) if isinstance(trigger, (int, float, pd.Series, pd.Index)) else trigger,
+                "trigger": int(trigger),
                 "plots": plots
             })
 
         return jsonify({"triggers": triggers_data})
 
-
     # -----------------------------
-    # Main navigator page
+    # Render main page
     # -----------------------------
     def render_navigator_page(self):
-        """
-        Render the main template (loads only the page skeleton; runs and triggers
-        are loaded via AJAX)
-        """
         return render_template('plot_navigator.html')
