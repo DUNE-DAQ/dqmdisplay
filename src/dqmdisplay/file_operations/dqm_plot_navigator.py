@@ -73,9 +73,6 @@ class DQMPlotNavigator:
         return jsonify({"runs": sorted_runs})
 
     def get_triggers_json(self, run: int):
-        '''
-        HW: Please re-write this I gave up here and got an LLM to do this :')
-        '''
         df = self.database_collection.get_existing_combos()
         df_run = df[df['run'] == run]
         triggers_data = []
@@ -106,13 +103,18 @@ class DQMPlotNavigator:
                         "params": extra_params
                     })
 
+            # Collect all display names for trigger
+            display_names = list({plot["display_name"].split(" ")[0] for plot in plots})
+
             triggers_data.append({
                 "trigger": int(trigger),
-                "plots": plots
+                "plots": plots,
+                "display_names": display_names  # <-- add this
             })
 
-        return jsonify({"triggers": triggers_data})
+        triggers_data.reverse()
 
+        return jsonify({"triggers": triggers_data, "num_triggers": len(triggers_data)})  # <-- add count
     # -----------------------------
     # Render main page
     # -----------------------------

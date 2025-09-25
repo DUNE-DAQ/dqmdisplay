@@ -10,26 +10,19 @@
                 then click on trigger numbers to see available plots grouped by display.
             </p>
 
+            <!-- Runs per page dropdown -->
+            <div class="mb-3">
+                <label for="pageSizeSelect">Runs per page:</label>
+                <select id="pageSizeSelect" class="form-control form-control-sm" style="width: 100px;">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+
             <!-- Search box -->
             <div class="mb-3">
                 <input type="text" id="runSearchInput" class="form-control form-control-sm" placeholder="Search runs...">
-            </div>
-
-            <!-- Collapsible settings box -->
-            <div class="mb-3">
-                <button class="btn btn-outline-secondary btn-sm" type="button" data-toggle="collapse" data-target="#settingsCollapse" aria-expanded="false" aria-controls="settingsCollapse">
-                    <i class="fas fa-cog mr-1"></i> Display Settings
-                </button>
-                <div class="collapse mt-2" id="settingsCollapse">
-                    <div class="card card-body">
-                        <label for="pageSizeSelect">Runs per page:</label>
-                        <select id="pageSizeSelect" class="form-control form-control-sm" style="width: 100px;">
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-                    </div>
-                </div>
             </div>
 
             <!-- Runs accordion -->
@@ -114,6 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         pageInfo.textContent = `Page ${currentPage+1} of ${Math.ceil(filteredRuns.length/pageSize)}`;
 
+        // Preload triggers for all runs on page
         runsToDisplay.forEach(run => {
             const runCard = document.createElement('div');
             runCard.className = "card mb-2";
@@ -121,7 +115,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const runHeader = document.createElement('div');
             runHeader.className = "card-header";
             runHeader.id = `runHeading${run}`;
-
             runHeader.innerHTML = `
                 <h2 class="mb-0">
                     <button class="btn btn-link collapsed" type="button" 
@@ -148,88 +141,93 @@ document.addEventListener('DOMContentLoaded', function() {
             runCard.appendChild(runCollapse);
             runAccordion.appendChild(runCard);
 
-            // Lazy-load triggers
-            $(runCollapse).on('show.bs.collapse', function () {
-                const triggerAccordion = document.getElementById(`triggerAccordion${run}`);
-                if (triggerAccordion.childElementCount === 0) {
-                    fetch(`{{ url_for('plot_navigator_triggers', run=0) }}`.replace("0", run))
-                        .then(res => res.json())
-                        .then(triggersData => {
-                            triggersData.triggers.forEach(triggerObj => {
-                                const trigger = triggerObj.trigger;
-                                const plots = triggerObj.plots;
+            // Fetch triggers immediately
+            const triggerAccordion = document.getElementById(`triggerAccordion${run}`);
+            fetch(`{{ url_for('plot_navigator_triggers', run=0) }}`.replace("0", run))
+                .then(res => res.json())
+                .then(triggersData => {
+                    // Add trigger count badge to run header
+                    const runHeaderBtn = runHeader.querySelector('button');
+                    const badgeSpan = document.createElement('span');
+                    badgeSpan.className = 'badge badge-info ml-2';
+                    badgeSpan.textContent = triggersData.num_triggers + ' trigger(s)';
+                    runHeaderBtn.appendChild(badgeSpan);
 
-                                const triggerCard = document.createElement('div');
-                                triggerCard.className = "card mb-1";
+                    triggersData.triggers.forEach(triggerObj => {
+                        const trigger = triggerObj.trigger;
+                        const plots = triggerObj.plots;
+                        const displayNames = triggerObj.display_names.join(', ');
 
-                                const triggerHeader = document.createElement('div');
-                                triggerHeader.className = "card-header py-2";
-                                triggerHeader.id = `triggerHeading${run}${trigger}`;
-                                triggerHeader.innerHTML = `
-                                    <h5 class="mb-0">
-                                        <button class="btn btn-link btn-sm collapsed" type="button"
-                                                data-toggle="collapse" data-target="#triggerCollapse${run}${trigger}"
-                                                aria-expanded="false" aria-controls="triggerCollapse${run}${trigger}">
-                                            <i class="fas fa-chevron-right mr-2" style="font-size:0.8em;"></i>
-                                            <strong>Trigger ${trigger}</strong>
-                                            <span class="badge badge-info badge-sm ml-2">${plots.length} plot(s)</span>
-                                        </button>
-                                    </h5>
-                                `;
+                        const triggerCard = document.createElement('div');
+                        triggerCard.className = "card mb-1";
 
-                                const triggerCollapse = document.createElement('div');
-                                triggerCollapse.className = "collapse";
-                                triggerCollapse.id = `triggerCollapse${run}${trigger}`;
-                                triggerCollapse.setAttribute("aria-labelledby", `triggerHeading${run}${trigger}`);
-                                triggerCollapse.setAttribute("data-parent", `#triggerAccordion${run}`);
+                        const triggerHeader = document.createElement('div');
+                        triggerHeader.className = "card-header py-2";
+                        triggerHeader.id = `triggerHeading${run}${trigger}`;
+                        triggerHeader.innerHTML = `
+                            <h5 class="mb-0">
+                                <button class="btn btn-link btn-sm collapsed" type="button"
+                                        data-toggle="collapse" data-target="#triggerCollapse${run}${trigger}"
+                                        aria-expanded="false" aria-controls="triggerCollapse${run}${trigger}">
+                                    <i class="fas fa-chevron-right mr-2" style="font-size:0.8em;"></i>
+                                    <strong>Trigger ${trigger}</strong>
+                                    <span class="badge badge-info badge-sm ml-2">${plots.length} plot(s)</span>
+                                    <span class="badge badge-secondary badge-sm ml-1">${displayNames}</span>
+                                </button>
+                            </h5>
+                        `;
 
-                                const triggerBody = document.createElement('div');
-                                triggerBody.className = "card-body py-2";
+                        const triggerCollapse = document.createElement('div');
+                        triggerCollapse.className = "collapse";
+                        triggerCollapse.id = `triggerCollapse${run}${trigger}`;
+                        triggerCollapse.setAttribute("aria-labelledby", `triggerHeading${run}${trigger}`);
+                        triggerCollapse.setAttribute("data-parent", `#triggerAccordion${run}`);
 
-                                // Group plots by display
-                                const displayGroups = {};
-                                plots.forEach(plot => {
-                                    const dispName = plot.display_name.split(' ')[0];
-                                    if (!displayGroups[dispName]) displayGroups[dispName] = [];
-                                    displayGroups[dispName].push(plot);
-                                });
+                        const triggerBody = document.createElement('div');
+                        triggerBody.className = "card-body py-2";
 
-                                const table = document.createElement('table');
-                                table.className = "table table-sm mb-0";
-
-                                const headerRow = document.createElement('tr');
-                                for (const disp in displayGroups) {
-                                    const th = document.createElement('th');
-                                    th.textContent = disp;
-                                    headerRow.appendChild(th);
-                                }
-                                table.appendChild(headerRow);
-
-                                const maxRows = Math.max(...Object.values(displayGroups).map(a => a.length));
-                                for (let i=0; i<maxRows; i++) {
-                                    const row = document.createElement('tr');
-                                    for (const disp in displayGroups) {
-                                        const td = document.createElement('td');
-                                        if (displayGroups[disp][i]) {
-                                            const plot = displayGroups[disp][i];
-                                            td.innerHTML = `<a href="${plot.url}" class="btn btn-outline-primary btn-sm btn-block text-left">
-                                                <i class="fas fa-chart-line mr-1"></i>${plot.display_name}
-                                            </a>`;
-                                        }
-                                        row.appendChild(td);
-                                    }
-                                    table.appendChild(row);
-                                }
-
-                                triggerBody.appendChild(table);
-                                triggerCollapse.appendChild(triggerBody);
-                                triggerCard.appendChild(triggerHeader);
-                                triggerCard.appendChild(triggerCollapse);
-                                triggerAccordion.appendChild(triggerCard);
-                            });
+                        // Group plots by display
+                        const displayGroups = {};
+                        plots.forEach(plot => {
+                            const dispName = plot.display_name.split(' ')[0];
+                            if (!displayGroups[dispName]) displayGroups[dispName] = [];
+                            displayGroups[dispName].push(plot);
                         });
-                }
-            });
+
+                        const table = document.createElement('table');
+                        table.className = "table table-sm mb-0";
+
+                        const headerRow = document.createElement('tr');
+                        for (const disp in displayGroups) {
+                            const th = document.createElement('th');
+                            th.textContent = disp;
+                            headerRow.appendChild(th);
+                        }
+                        table.appendChild(headerRow);
+
+                        const maxRows = Math.max(...Object.values(displayGroups).map(a => a.length));
+                        for (let i=0; i<maxRows; i++) {
+                            const row = document.createElement('tr');
+                            for (const disp in displayGroups) {
+                                const td = document.createElement('td');
+                                if (displayGroups[disp][i]) {
+                                    const plot = displayGroups[disp][i];
+                                    td.innerHTML = `<a href="${plot.url}" class="btn btn-outline-primary btn-sm btn-block text-left">
+                                        <i class="fas fa-chart-line mr-1"></i>${plot.display_name}
+                                    </a>`;
+                                }
+                                row.appendChild(td);
+                            }
+                            table.appendChild(row);
+                        }
+
+                        triggerBody.appendChild(table);
+                        triggerCollapse.appendChild(triggerBody);
+                        triggerCard.appendChild(triggerHeader);
+                        triggerCard.appendChild(triggerCollapse);
+                        triggerAccordion.appendChild(triggerCard);
+                    });
+                });
         });
     }
 });
