@@ -1,587 +1,147 @@
 {% extends "base.html" %}
 
-{% block title %}Plot Navigator{% endblock %}
-
 {% block content %}
 <div class="container-fluid">
-    <h1 class="mb-4">Plot Navigator</h1>
-
-    {% if run_summaries %}
-        <!-- Pagination Controls (Top) -->
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <div class="d-flex align-items-center">
-                    <label for="per-page-select" class="form-label mr-2 mb-0">Runs per page:</label>
-                    <select id="per-page-select" class="form-control" style="width: auto;" onchange="changePerPage(this.value)">
-                        {% for option in per_page_options %}
-                            <option value="{{ option }}" {% if option == per_page %}selected{% endif %}>
-                                {{ option }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="col-md-6 text-right">
-                <span class="text-muted">
-                    Showing {{ (current_page - 1) * per_page + 1 }} - 
-                    {% set end_entry = current_page * per_page %}
-                    {% if end_entry > total_entries %}{{ total_entries }}{% else %}{{ end_entry }}{% endif %}
-                    of {{ total_entries }} runs
-                </span>
-            </div>
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">Plot Navigator</h2>
+            <p class="text-muted mb-4">
+                Browse available plots organized by run and trigger. Click on run numbers to expand and see available triggers,
+                then click on trigger numbers to see available plots for that combination.
+            </p>
+            
+            <div id="runAccordion" class="accordion"></div>
         </div>
-
-        <!-- Plot Entries -->
-        <div class="plot-entries">
-            {% for run_summary in run_summaries %}
-            <div class="card mb-3" id="run-card-{{ run_summary.run }}">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <!-- Use Bootstrap native collapse attributes (no onclick) -->
-                        <button class="btn btn-link btn-block text-left collapsed" type="button"
-                                data-toggle="collapse"
-                                data-target="#collapse{{ run_summary.run }}"
-                                aria-expanded="false"
-                                aria-controls="collapse{{ run_summary.run }}">
-                            <i class="fas fa-chevron-right transition-icon" id="icon{{ run_summary.run }}"></i>
-                            Run {{ run_summary.run }}
-                            <span class="badge badge-primary ml-2">{{ run_summary.trigger_count }} triggers</span>
-                            <span class="badge badge-success ml-1">{{ run_summary.plot_count }} plots</span>
-                        </button>
-                    </h5>
-                </div>
-
-                <!-- Collapse body (Bootstrap will toggle .show and inline styles) -->
-                <div id="collapse{{ run_summary.run }}" class="collapse" data-run="{{ run_summary.run }}">
-                    <div class="card-body">
-                        <div class="text-center py-3" id="loading{{ run_summary.run }}">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="sr-only">Loading...</span>
-                            </div>
-                            <div class="mt-2 text-muted">Loading triggers...</div>
-                        </div>
-                        <div id="triggers{{ run_summary.run }}" class="d-none">
-                            <!-- Triggers will be loaded here via AJAX or cache -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- Enhanced Pagination Controls (Bottom) -->
-        <nav aria-label="Page navigation" class="mt-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="text-muted">
-                    Page {{ current_page }} of {{ total_pages }}
-                </div>
-                <ul class="pagination mb-0">
-                    <!-- First Page -->
-                    {% if current_page > 1 %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page=1&per_page={{ per_page }}" title="First Page">
-                                First
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">First</span>
-                        </li>
-                    {% endif %}
-                    
-                    <!-- Previous Page -->
-                    {% if has_prev %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ prev_page }}&per_page={{ per_page }}">
-                                <i class="fas fa-chevron-left"></i> Previous
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">
-                                <i class="fas fa-chevron-left"></i> Previous
-                            </span>
-                        </li>
-                    {% endif %}
-                    
-                    <!-- Page Numbers -->
-                    {% for page_num in page_range %}
-                        {% if page_num == current_page %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
-                            </li>
-                        {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_num }}&per_page={{ per_page }}">
-                                    {{ page_num }}
-                                </a>
-                            </li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    <!-- Next Page -->
-                    {% if has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ next_page }}&per_page={{ per_page }}">
-                                Next <i class="fas fa-chevron-right"></i>
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">
-                                Next <i class="fas fa-chevron-right"></i>
-                            </span>
-                        </li>
-                    {% endif %}
-                    
-                    <!-- Last Page -->
-                    {% if current_page < total_pages %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ total_pages }}&per_page={{ per_page }}" title="Last Page">
-                                Last
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">Last</span>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </nav>
-
-    {% else %}
-        <!-- No Data Alert -->
-        <div class="alert alert-warning" role="alert">
-            <h4 class="alert-heading">
-                <i class="fas fa-exclamation-triangle"></i> No Data Available
-            </h4>
-            <p>No run/trigger combinations found in the data directories.</p>
-            <hr>
-            <p class="mb-0">Please check if the data directories contain files and the file patterns are correct.</p>
-        </div>
-    {% endif %}
-    
-</div> <!-- End container -->
-
-<script>
-// Use caching + Bootstrap native collapse events
-const CACHE_KEY = "plotNavigatorCache";
-const loadedRuns = new Set();
-const loadingRuns = new Set();
-
-// Restore cache
-let runCache = {};
-try {
-    runCache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
-} catch (e) {
-    runCache = {};
-}
-
-function saveCache() {
-    try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(runCache));
-    } catch (e) {
-        // localStorage may be full or disabled — ignore gracefully
-        console.warn('Could not save plot navigator cache', e);
-    }
-}
-
-function changePerPage(newPerPage) {
-    const url = new URL(window.location);
-    url.searchParams.set('per_page', newPerPage);
-    url.searchParams.set('page', '1');
-    window.location.href = url.toString();
-}
-
-// Render triggers HTML for a run (same as previous renderTriggers)
-function renderTriggers(runId, triggers) {
-    const triggersContainer = document.getElementById(`triggers${runId}`);
-    if (!triggersContainer) return;
-
-    if (!triggers || triggers.length === 0) {
-        triggersContainer.innerHTML = '<div class="text-muted text-center py-3">No triggers available</div>';
-        return;
-    }
-
-    let html = '';
-    triggers.forEach(trigger => {
-        html += `
-            <div class="card mb-3 trigger-card">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">
-                        <button class="btn btn-link btn-sm collapsed" type="button"
-                                data-toggle="collapse"
-                                data-target="#triggerCollapse${runId}_${trigger.trigger}"
-                                aria-expanded="false"
-                                aria-controls="triggerCollapse${runId}_${trigger.trigger}">
-                            <i class="fas fa-chevron-right transition-icon" id="triggerIcon${runId}_${trigger.trigger}"></i>
-                            Trigger ${trigger.trigger}
-                            <span class="badge badge-info ml-2">${trigger.plot_count} plots</span>
-                        </button>
-                    </h6>
-                </div>
-                <div id="triggerCollapse${runId}_${trigger.trigger}" class="collapse">
-                    <div class="card-body">
-                        ${renderPlots(trigger)}
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-
-    triggersContainer.innerHTML = html;
-
-    // After injecting trigger collapse elements, attach icon toggle handlers for trigger-level collapse events
-    // Use Bootstrap events (jQuery required by Bootstrap 4)
-    // When trigger collapse shows/hides, rotate icon
-    // This uses event delegation for performance
-    // (We rely on Bootstrap's 'show.bs.collapse'/'hide.bs.collapse' fired on inserted elements)
-}
-
-// Render plots grouped by display
-function renderPlots(trigger) {
-    if (!trigger.plots || trigger.plots.length === 0) {
-        return '<div class="text-muted">No plots available for this trigger</div>';
-    }
-    const plotsByDisplay = {};
-    trigger.plots.forEach(plot => {
-        if (!plotsByDisplay[plot.display]) {
-            plotsByDisplay[plot.display] = [];
-        }
-        plotsByDisplay[plot.display].push(plot);
-    });
-    let html = '';
-    Object.keys(plotsByDisplay).forEach(displayName => {
-        html += `<div class="mb-3">
-            <h6 class="text-primary"><i class="fas fa-chart-bar"></i> ${displayName}</h6>
-            <ul class="list-unstyled ml-3">`;
-        plotsByDisplay[displayName].forEach(plot => {
-            const params = new URLSearchParams(plot.url_params).toString();
-            html += `
-                <li class="mb-1">
-                    <a href="/${plot.view_name}?${params}" class="text-decoration-none plot-link">
-                        <i class="fas fa-external-link-alt mr-1"></i>${plot.title}
-                    </a>
-                </li>`;
-        });
-        html += '</ul></div>';
-    });
-    return html;
-}
-
-async function fetchTriggers(runId) {
-    if (loadingRuns.has(runId) || loadedRuns.has(runId)) return;
-    loadingRuns.add(runId);
-
-    const loadingEl = document.getElementById(`loading${runId}`);
-    const triggersEl = document.getElementById(`triggers${runId}`);
-    if (loadingEl) loadingEl.classList.remove('d-none');
-    if (triggersEl) triggersEl.classList.add('d-none');
-
-    try {
-        const resp = await fetch(`/navigator/triggers/${runId}`);
-        const data = await resp.json();
-        if (data.success) {
-            const triggers = data.triggers || [];
-            // save to cache
-            runCache[runId] = runCache[runId] || {};
-            runCache[runId].triggers = triggers;
-            saveCache();
-
-            renderTriggers(runId, triggers);
-            loadedRuns.add(runId);
-        } else {
-            renderTriggerError(runId, data.error || 'Failed to load triggers');
-        }
-    } catch (e) {
-        renderTriggerError(runId, 'Network error loading triggers');
-    } finally {
-        loadingRuns.delete(runId);
-        if (loadingEl) loadingEl.classList.add('d-none');
-        if (triggersEl) triggersEl.classList.remove('d-none');
-
-        // Attach trigger collapse icon handlers (for dynamic content)
-        attachTriggerCollapseHandlers();
-    }
-}
-
-function renderTriggerError(runId, message) {
-    const triggersContainer = document.getElementById(`triggers${runId}`);
-    if (!triggersContainer) return;
-    triggersContainer.innerHTML = `
-        <div class="alert alert-danger" role="alert">
-            <i class="fas fa-exclamation-triangle"></i> Error loading triggers: ${message}
-        </div>
-    `;
-}
-
-// Use Bootstrap events to load data when a run's collapse is shown.
-// This code depends on jQuery + Bootstrap JS (Bootstrap 4)
-document.addEventListener('DOMContentLoaded', function() {
-    // icon transition
-    document.querySelectorAll('.transition-icon').forEach(icon => {
-        icon.style.transition = 'transform 0.2s ease';
-    });
-
-    // Attach event handlers for run-level collapses (delegated)
-    // We rely on Bootstrap's jQuery events: 'show.bs.collapse' and 'hide.bs.collapse'
-    // Use document-level delegation to pick up dynamically created elements too
-    $(document).on('show.bs.collapse', '.collapse', function (e) {
-        // Only respond to top-level run collapses, not trigger sub-collapses:
-        // run collapse has id like "collapse<run>" and sits directly under card
-        const el = e.target; // the element being shown
-        // If it's a trigger-level collapse, its id will start with 'triggerCollapse'
-        if (el.id && el.id.startsWith('collapse')) {
-            const runId = el.getAttribute('data-run');
-            if (!runId) return;
-
-            // rotate the run icon
-            const icon = document.getElementById(`icon${runId}`);
-            if (icon) icon.style.transform = 'rotate(90deg)';
-
-            // If cached triggers exist, use them
-            if (runCache[runId] && runCache[runId].triggers) {
-                renderTriggers(runId, runCache[runId].triggers || []);
-                // hide spinner, show triggers
-                const loadingEl = document.getElementById(`loading${runId}`);
-                const triggersEl = document.getElementById(`triggers${runId}`);
-                if (loadingEl) loadingEl.classList.add('d-none');
-                if (triggersEl) triggersEl.classList.remove('d-none');
-
-                // After injecting trigger collapse elements, attach icon handlers
-                attachTriggerCollapseHandlers();
-                loadedRuns.add(runId);
-            } else {
-                // fetch from server (AJAX)
-                fetchTriggers(runId);
-            }
-        }
-    });
-
-    $(document).on('hide.bs.collapse', '.collapse', function (e) {
-        const el = e.target;
-        if (el.id && el.id.startsWith('collapse')) {
-            const runId = el.getAttribute('data-run');
-            if (!runId) return;
-            const icon = document.getElementById(`icon${runId}`);
-            if (icon) icon.style.transform = 'rotate(0deg)';
-
-            // store expanded state
-            runCache[runId] = runCache[runId] || {};
-            runCache[runId].expanded = false;
-            saveCache();
-        }
-    });
-
-    $(document).on('shown.bs.collapse', '.collapse', function (e) {
-        const el = e.target;
-        if (el.id && el.id.startsWith('collapse')) {
-            const runId = el.getAttribute('data-run');
-            if (!runId) return;
-            runCache[runId] = runCache[runId] || {};
-            runCache[runId].expanded = true;
-            saveCache();
-        }
-    });
-
-    // Restore cached expanded runs on page load
-    Object.keys(runCache).forEach(runId => {
-        if (runCache[runId] && runCache[runId].expanded) {
-            // Open the collapse via Bootstrap's API so events fire and transitions happen
-            const target = $(`#collapse${runId}`);
-            if (target.length) {
-                target.collapse('show');
-                // If triggers are cached, render them now
-                if (runCache[runId].triggers) {
-                    renderTriggers(runId, runCache[runId].triggers || []);
-                    const loadingEl = document.getElementById(`loading${runId}`);
-                    const triggersEl = document.getElementById(`triggers${runId}`);
-                    if (loadingEl) loadingEl.classList.add('d-none');
-                    if (triggersEl) triggersEl.classList.remove('d-none');
-                    // Attach trigger collapse handlers after injection
-                    attachTriggerCollapseHandlers();
-                    loadedRuns.add(runId);
-                } else {
-                    // load from server
-                    fetchTriggers(runId);
-                }
-            }
-        }
-    });
-
-    // Attach trigger collapse handlers for any trigger collapses that appear later
-    attachTriggerCollapseHandlers();
-
-    console.log('Plot navigator initialized (Bootstrap-native collapse, caching enabled)');
-});
-
-// Attach handlers to trigger-level collapse events to rotate their icons.
-// Use event delegation since triggers are injected dynamically.
-function attachTriggerCollapseHandlers() {
-    // Remove previous delegated handlers (to avoid duplicate rotations) and reattach
-    $(document).off('show.bs.collapse.triggerIcon hide.bs.collapse.triggerIcon', '[id^="triggerCollapse"]');
-
-    $(document).on('show.bs.collapse.triggerIcon', '[id^="triggerCollapse"]', function(e) {
-        const el = e.target;
-        const id = el.id; // triggerCollapse{run}_{trigger}
-        // extract run and trigger
-        const match = id.match(/^triggerCollapse(.+?)_(.+)$/);
-        if (!match) return;
-        const runId = match[1];
-        const triggerId = match[2];
-        const icon = document.getElementById(`triggerIcon${runId}_${triggerId}`);
-        if (icon) icon.style.transform = 'rotate(90deg)';
-    });
-
-    $(document).on('hide.bs.collapse.triggerIcon', '[id^="triggerCollapse"]', function(e) {
-        const el = e.target;
-        const id = el.id;
-        const match = id.match(/^triggerCollapse(.+?)_(.+)$/);
-        if (!match) return;
-        const runId = match[1];
-        const triggerId = match[2];
-        const icon = document.getElementById(`triggerIcon${runId}_${triggerId}`);
-        if (icon) icon.style.transform = 'rotate(0deg)';
-    });
-}
-</script>
+    </div>
+</div>
 
 <style>
-/* Enhanced styling for better usability and performance */
-.plot-entries .card {
-    border: 1px solid #dee2e6;
-    transition: box-shadow 0.15s ease;
-}
-
-.plot-entries .card:hover {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.trigger-card {
-    border: 1px solid #e9ecef !important;
-    box-shadow: none !important;
-}
-
-.trigger-card:hover {
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
-}
-
-/* IMPORTANT: do NOT override Bootstrap's .collapse behavior (remove display:none/block rules).
-   Let Bootstrap manage the collapse height/transition. */
-
-/* btn-link tweaks retained */
-.btn-link {
-    text-decoration: none !important;
-    color: inherit !important;
-    width: 100%;
+/* Minimal styles for accordion */
+.accordion .btn-link {
     text-align: left;
+    width: 100%;
 }
-
-.btn-link:hover {
-    color: #0056b3 !important;
+.fas.fa-chevron-right {
+    transition: transform 0.2s ease-in-out;
 }
-
-.btn-link:focus {
-    box-shadow: none;
+button[aria-expanded="true"] .fas.fa-chevron-right {
+    transform: rotate(90deg);
 }
-
-/* Icon animations */
-.transition-icon {
-    transition: transform 0.2s ease;
-    margin-right: 8px;
-}
-
-/* Better link styling */
-.plot-link {
-    display: inline-block;
-    padding: 2px 0;
-    transition: color 0.2s ease;
-}
-
-.plot-link:hover {
-    color: #0056b3 !important;
-    text-decoration: none;
-}
-
-/* Loading spinner improvements */
-.spinner-border {
-    width: 2rem;
-    height: 2rem;
-}
-
-/* Badge improvements */
-.badge {
-    font-size: 0.7em;
-}
-
-/* Pagination improvements */
-.pagination .page-link {
-    color: #007bff;
-    border-color: #dee2e6;
-}
-
-.pagination .page-link:hover {
-    color: #0056b3;
-    background-color: #e9ecef;
-    border-color: #dee2e6;
-}
-
-.pagination .page-item.active .page-link {
-    background-color: #007bff;
-    border-color: #007bff;
-}
-
-/* Color classes for different display types */
-.text-primary { color: #007bff !important; }
-.text-success { color: #28a745 !important; }
-.text-warning { color: #ffc107 !important; }
-.text-info { color: #17a2b8 !important; }
-.text-secondary { color: #6c757d !important; }
-
-/* Responsive improvements */
-@media (max-width: 768px) {
-    .col-md-4, .col-md-3, .col-md-6 {
-        margin-bottom: 1rem;
-    }
-    
-    .btn-link {
-        font-size: 0.9rem;
-    }
-    
-    .badge {
-        font-size: 0.6em;
-    }
-}
-
-/* Performance optimizations */
-* {
-    box-sizing: border-box;
-}
-
-.container-fluid {
-    will-change: scroll-position;
-}
-
-/* Visual improvements */
-.card-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.bg-light {
-    background-color: #f8f9fa !important;
-}
-
-/* Ensure proper nesting */
-.trigger-card .card-header {
-    background-color: #f1f3f4;
-}
-
-/* Loading state improvements */
-.d-none {
-    display: none !important;
+.card-body {
+    padding: 0.5rem;
 }
 </style>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    const runAccordion = document.getElementById('runAccordion');
+
+    // Load initial runs (first page)
+    fetch("{{ url_for('plot_navigator_runs') }}")
+        .then(res => res.json())
+        .then(data => {
+            data.runs.forEach(run => {
+                const runCard = document.createElement('div');
+                runCard.className = "card mb-2";
+
+                const runHeader = document.createElement('div');
+                runHeader.className = "card-header";
+                runHeader.id = `runHeading${run}`;
+
+                runHeader.innerHTML = `
+                    <h2 class="mb-0">
+                        <button class="btn btn-link collapsed" type="button" 
+                                data-toggle="collapse" data-target="#runCollapse${run}" 
+                                aria-expanded="false" aria-controls="runCollapse${run}">
+                            <i class="fas fa-chevron-right mr-2"></i>
+                            <strong>Run ${run}</strong>
+                        </button>
+                    </h2>
+                `;
+
+                const runCollapse = document.createElement('div');
+                runCollapse.className = "collapse";
+                runCollapse.id = `runCollapse${run}`;
+                runCollapse.setAttribute("aria-labelledby", `runHeading${run}`);
+                runCollapse.setAttribute("data-parent", "#runAccordion");
+
+                const bodyDiv = document.createElement('div');
+                bodyDiv.className = "card-body";
+                bodyDiv.innerHTML = `<div class="accordion" id="triggerAccordion${run}"></div>`;
+
+                runCollapse.appendChild(bodyDiv);
+                runCard.appendChild(runHeader);
+                runCard.appendChild(runCollapse);
+                runAccordion.appendChild(runCard);
+
+                // Lazy-load triggers when run is expanded
+                $(runCollapse).on('show.bs.collapse', function () {
+                    const triggerAccordion = document.getElementById(`triggerAccordion${run}`);
+                    if (triggerAccordion.childElementCount === 0) {
+                        fetch(`{{ url_for('plot_navigator_triggers', run=0) }}`.replace("0", run))
+                            .then(res => res.json())
+                            .then(triggersData => {
+                                triggersData.triggers.forEach(triggerObj => {
+                                    const trigger = triggerObj.trigger;
+                                    const plots = triggerObj.plots;
+                                    const triggerCard = document.createElement('div');
+                                    triggerCard.className = "card mb-1";
+
+                                    const triggerHeader = document.createElement('div');
+                                    triggerHeader.className = "card-header py-2";
+                                    triggerHeader.id = `triggerHeading${run}${trigger}`;
+                                    triggerHeader.innerHTML = `
+                                        <h5 class="mb-0">
+                                            <button class="btn btn-link btn-sm collapsed" type="button"
+                                                    data-toggle="collapse" data-target="#triggerCollapse${run}${trigger}"
+                                                    aria-expanded="false" aria-controls="triggerCollapse${run}${trigger}">
+                                                <i class="fas fa-chevron-right mr-2" style="font-size:0.8em;"></i>
+                                                <strong>Trigger ${trigger}</strong>
+                                                <span class="badge badge-info badge-sm ml-2">${plots.length} plot(s)</span>
+                                            </button>
+                                        </h5>
+                                    `;
+
+                                    const triggerCollapse = document.createElement('div');
+                                    triggerCollapse.className = "collapse";
+                                    triggerCollapse.id = `triggerCollapse${run}${trigger}`;
+                                    triggerCollapse.setAttribute("aria-labelledby", `triggerHeading${run}${trigger}`);
+                                    triggerCollapse.setAttribute("data-parent", `#triggerAccordion${run}`);
+
+                                    const triggerBody = document.createElement('div');
+                                    triggerBody.className = "card-body py-2";
+                                    const rowDiv = document.createElement('div');
+                                    rowDiv.className = "row";
+
+                                    plots.forEach(plot => {
+                                        const colDiv = document.createElement('div');
+                                        colDiv.className = "col-md-6 col-lg-4 mb-2";
+                                        colDiv.innerHTML = `
+                                            <div class="card border-light">
+                                                <div class="card-body py-2 px-3">
+                                                    <a href="${plot.url}" class="btn btn-outline-primary btn-sm btn-block text-left">
+                                                        <i class="fas fa-chart-line mr-2"></i>
+                                                        ${plot.display_name}
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        `;
+                                        rowDiv.appendChild(colDiv);
+                                    });
+
+                                    triggerBody.appendChild(rowDiv);
+                                    triggerCollapse.appendChild(triggerBody);
+                                    triggerCard.appendChild(triggerHeader);
+                                    triggerCard.appendChild(triggerCollapse);
+                                    triggerAccordion.appendChild(triggerCard);
+                                });
+                            });
+                    }
+                });
+            });
+        });
+
+});
+</script>
 {% endblock %}

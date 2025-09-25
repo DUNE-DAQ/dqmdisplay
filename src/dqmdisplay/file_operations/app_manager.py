@@ -4,34 +4,24 @@
 #     wib_tests: bool  
 #     pds: bool
 
+from typing import List
 
 from dqmdisplay.file_operations.file_database import DQMImageDatabase
 from flask import Flask, render_template, url_for
 
 
-from typing import List
 
-
-class AppManager():
-    def __init__(self,
-                 view_name: str,
-                 database: DQMImageDatabase,
-                 html_path: str,
-                 additional_column_list: List[str] = [],
-                 default_cols: List[str] = ['run', 'trigger']
-                ):
-
+class RouteMaker():
+    def __init__(self, view_name: str, database: DQMImageDatabase, additional_column_list: List[str]=[], default_cols: List[str] = ['run', 'trigger']):
         # Set up prefix/suffix
         self._view_name = view_name
-        self._html_path = html_path
         self._database = database
         self._additional_columnn_list = additional_column_list
         self._full_column_list = default_cols + additional_column_list
 
-
     @classmethod
-    def __list_to_path(cls, l: List[str]):
-        return "".join(f"/{p}<{p}>" for p in l)
+    def __list_to_path(cls, names: List[str]):
+        return "".join(f"/{n}<{n}>" for n in names)
 
     def page_name(self):
         if self._database.name == self._view_name:
@@ -49,6 +39,26 @@ class AppManager():
     @property
     def full_url(self):
         return self.__to_url(self._full_column_list)
+
+
+
+class AppManager():
+    def __init__(self,
+                 view_name: str,
+                 database: DQMImageDatabase,
+                 html_path: str,
+                 additional_column_list: List[str] = [],
+                 default_cols: List[str] = ['run', 'trigger']
+                ):
+
+        # Set up prefix/suffix
+        self._html_path = html_path
+        self._database = database
+        self._additional_columnn_list = additional_column_list
+        self._full_column_list = default_cols + additional_column_list
+
+        self._route_maker = RouteMaker(view_name, database, additional_column_list, default_cols)
+
                 
 
     def _add_image_to_app(self, images, vals):
@@ -77,12 +87,12 @@ class AppManager():
         if next_args and not self._database.get_eq(**current_det, **next_args).empty:
             # Merge the navigation args with current path-specific args
             next_kwargs = {**{k: v for k, v in vals.items() if k in self._additional_columnn_list}, **next_args}
-            next_url = url_for(self.page_name(), **next_kwargs)
+            next_url = url_for(self._route_maker.page_name(), **next_kwargs)
 
 
         if prev_args and not self._database.get_eq(**current_det, **prev_args).empty:
             prev_kwargs = {**{k: v for k, v in vals.items() if k in self._additional_columnn_list}, **prev_args}
-            prev_url = url_for(self.page_name(), **prev_kwargs)
+            prev_url = url_for(self._route_maker.page_name(), **prev_kwargs)
 
         return render_template(self._html_path, images=images,
                              next_url=next_url, prev_url=prev_url,
@@ -97,5 +107,5 @@ class AppManager():
         return self._add_image_to_app(images, kwargs)    
 
     def add_to_app(self, app: Flask):        
-        app.add_url_rule(self.full_url, self.page_name(), self.add_image_to_app)
-        app.add_url_rule(self.latest_url, "latest_"+self.page_name(), self.add_latest_to_app)
+        app.add_url_rule(self._route_maker.full_url, self._route_maker.page_name(), self.add_image_to_app)
+        app.add_url_rule(self._route_maker.latest_url, "latest_"+self._route_maker.page_name(), self.add_latest_to_app)

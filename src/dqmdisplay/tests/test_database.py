@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import itertools
+
 
 import pytest
 
@@ -22,10 +24,16 @@ TEST_DATA = pd.DataFrame({'run': runs, 'trigger': triggers, 'files': files})
 A_RUNS = [1, 2, 3]
 A_ELEMENTS = [1,2,3]
 A_TRIGGERS = [1, 2, 3]
+a_combos = list(itertools.product(A_RUNS, A_TRIGGERS))
+# uniuqe combos
+A_RUN_TRIGGERS = pd.DataFrame(a_combos, columns=['run', 'trigger'])
 A_REGEX=r"A_run(?P<run>\d+)_trigger(?P<trigger>\d+)_element_id(?P<element_id>\d+).png"
 
 B_RUNS = [1, 4, 5]
 B_TRIGGERS = [3, 4, 5]
+b_combos = list(itertools.product(B_RUNS, B_TRIGGERS))
+B_RUN_TRIGGERS = pd.DataFrame(b_combos, columns=['run', 'trigger'])
+
 B_REGEX=r"B_run(?P<run>\d+)_trigger(?P<trigger>\d+).png"
 
 def test_navigable_dataframe_basic():
@@ -184,6 +192,48 @@ def test_image_database_collection(dummy_file_maker):
     
     # Now we want to see if it exists
     exist_check = image_collection.check_exists(**{'run': 2, 'trigger': 1})    
-    assert exist_check == {'my_database_a': True, 'my_database_b': False, 'my_database_a_element': {3: True, 2: True, 1: True}}
     
-    print(image_collection.get_unique_as_dict(['run', 'trigger']))
+    expected_exist = [{'name': 'my_database_a',
+                            'run': 2,
+                            'trigger': 1,
+                            'exists': True},
+                           
+                           {'name': 'my_database_b',
+                            'run': 2,
+                            'trigger': 1,
+                            'exists': False
+                            },
+
+                            {'name': 'my_database_a_element',
+                            'run': 2,
+                            'trigger': 1,
+                            'element_id': 1,
+                            'exists': True
+                            },
+
+                            {'name': 'my_database_a_element',
+                            'run': 2,
+                            'trigger': 1,
+                            'element_id': 2,
+                            'exists': True
+                            },
+                            
+                            {'name': 'my_database_a_element',
+                            'run': 2,
+                            'trigger': 1,
+                            'element_id': 3,
+                            'exists': True
+                            },
+                    ]
+    
+    assert sorted(exist_check, key=lambda x: sorted(x.items())) == sorted(expected_exist, key=lambda x: sorted(x.items()))
+        
+    # Check the run/trigger getting process is the same
+    a_b_unique_triggers = pd.concat((A_RUN_TRIGGERS, B_RUN_TRIGGERS), ignore_index=True)
+    a_b_unique_triggers = a_b_unique_triggers.drop_duplicates()
+    a_b_unique_triggers.sort_values(['run', 'trigger'], ascending=False, inplace=True)
+    a_b_unique_triggers.reset_index(drop=True, inplace=True)
+        
+    pd.testing.assert_frame_equal(a_b_unique_triggers, image_collection.get_unique_cols_all_db(['run', 'trigger']))
+    
+    

@@ -71,7 +71,7 @@ class DQMDisplayApp:
         '''Initialize the plot navigator with default styling'''
         self._navigator = DQMPlotNavigator(
             database_collection=self._database_collection,
-            config=self._config
+            display_config=self._config
         )
         
         # You can customize styling here if needed
@@ -105,20 +105,3 @@ class DQMDisplayApp:
         
         # Add the plot navigator
         self._navigator.add_to_app(app)
-    
-    def refresh_data(self):
-        '''Refresh cached data (useful when files change)'''
-        # Invalidate navigator cache
-        if self._navigator:
-            self._navigator.invalidate_cache()
-        
-        # Could also refresh database data here if needed
-        # For now, databases are built at initialization time
-    
-    def add_custom_navigator_styling(self, display_name: str = None, view_name: str = None, **kwargs):
-        '''Add custom styling to the navigator'''
-        if display_name and self._navigator:
-            self._navigator.add_display_styling(display_name, **kwargs)
-        
-        if view_name and self._navigator:
-            self._navigator.add_view_styling(view_name, **kwargs)

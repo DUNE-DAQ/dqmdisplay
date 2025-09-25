@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Any
 from pathlib import Path
 
 
@@ -11,6 +11,8 @@ class ViewData:
     cols_to_search: List[str] = field(default_factory=lambda: [])
     name: str = "default"
 
+    def view_name_full(self, sub: Any):
+        return self.title.replace("{sub_option}", sub)
 
 @dataclass
 class DisplayData:

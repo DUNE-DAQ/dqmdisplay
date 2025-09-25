@@ -5,8 +5,6 @@ import pandas as pd
 from typing import List, Optional, Pattern, Tuple, Dict, Any
 import re
 from pathlib import Path
-from functools import lru_cache
-from dqmdisplay.utils.dict_tools import nested_group
 
 def check_cols_in_db(database: pd.DataFrame, col_list: List[str]):
     ''' Helper function for kwargs checking
@@ -185,6 +183,10 @@ class DQMImageDatabaseCollection :
         self._unique_combo_db = None
         self._new_df_added = True
 
+        self._combined_df: Optional[pd.DataFrame] = None
+        self._existing_combos: Optional[pd.DataFrame] = None
+
+
     @property
     def display_names(self):
         return list(self._views.keys())
@@ -204,6 +206,9 @@ class DQMImageDatabaseCollection :
     def get_display(self, display_name: str):
         return self._displays.get(display_name, None)
 
+    def get_all_views(self):
+        return self._views
+
     @classmethod
     def get_extra_col_unq(cls, dataframe: DQMImageDatabase, extra_col: Optional[str]=None):
         '''Gets unique values for some extra column
@@ -215,7 +220,7 @@ class DQMImageDatabaseCollection :
         return dataframe.get_unique(extra_col).copy()
 
 
-    def add_display(self, new_dataframe: DQMImageDatabase, extra_col: Optional[str]=None):
+    def add_display(self, new_dataframe: DQMImageDatabase):
         '''
         Add dataframe
         '''
@@ -237,36 +242,49 @@ class DQMImageDatabaseCollection :
             raise KeyError(f"Couldn't find {dataframe_name} in dataframes")
 
         unq_page_col_indices = self.get_extra_col_unq(self._displays[dataframe_name], extra_col)
+        
+        if unq_page_col_indices is not None:
+            unq_page_col_indices = unq_page_col_indices.tolist()
 
         self._views[view_name] = {
             'display_name': dataframe_name,
             'page_col_name': extra_col,
             'page_col_indices': unq_page_col_indices
         }
+        
 
     def check_exists(self, **kwargs):
-        '''
-        So now we have our displays dict, we can do this properly!
-        '''
-        return_dict = {}
+        """
+        Much faster existence check using cached dataframe.
+        """
+        existing = self.get_existing_combos()
+        if existing.empty:
+            return []
 
-        equal_list = {d_name: d.get_eq(**kwargs) for d_name, d in self._displays.items()}
+        # filter down to matching rows
+        mask = pd.Series(True, index=existing.index)
+        for col, val in kwargs.items():
+            if col in existing.columns:
+                mask &= existing[col] == val
+        filtered = existing[mask]
 
-        for display, opts in self._views.items():
-            # Not the most efficient since for multiple views we need to do this multiple times
-            equal_rows = equal_list[opts['display_name']]
+        return_list = []
+        for view_name, opts in self._views.items():
+            
+            
+            view_rows = filtered[filtered["view_name"] == view_name]
+            base_dict = {"name": view_name, **kwargs}
 
-            extra_col = opts['page_col_name']
-            if extra_col is None:
-                # Here we don't need to deal with any funkyness
-                return_dict[display] = not equal_rows.empty
-                continue
+            if opts["page_col_name"] is None:
+                return_list.append({**base_dict, "exists": not view_rows.empty})
+            else:
+                col = opts["page_col_name"]
+                for val in opts["page_col_indices"]:
+                    exists = not view_rows[view_rows[col] == val].empty
+                    return_list.append({**base_dict, col: val, "exists": exists})
 
-            extra_col_vals = opts['page_col_indices']
+        return return_list
 
-            return_dict[display] = {i: not equal_rows[equal_rows[extra_col]==i].empty for i in extra_col_vals}
-
-        return return_dict
 
     def get_unique_cols_all_db(self, col_labs: List[str]):
         # More efficient to cache this infomration
@@ -274,127 +292,68 @@ class DQMImageDatabaseCollection :
             return self._unique_combo_db
 
         # First time/if a new object has been added
-        concat_obj = pd.concat([d.as_dataframe()[col_labs] for d in self._displays.values()], ignore_index=True)
-        self._unique_combo_db = concat_obj.drop_duplicates().reset_index(drop=True)
-        self._unique_combo_db.sort_values(col_labs, ascending=False, inplace=True)
+        concat_obj = pd.concat((d.as_dataframe()[col_labs].drop_duplicates() for d in self._displays.values()), ignore_index=True)
+        self._unique_combo_db = concat_obj.drop_duplicates()
+        # Have to make implicit copy to stop pandas complaining here
+        self._unique_combo_db = self._unique_combo_db.sort_values(col_labs, ascending=False)
+        self._unique_combo_db.reset_index(drop=True, inplace=True)
 
         # Means we don't need to regenerate everything from scratch
         self._new_df_added = False
 
         return self._unique_combo_db
+    
+    def get_combined_dataframe(self) -> pd.DataFrame:
+        """
+        Combine all displays into one dataframe with view metadata.
+        Columns: run, trigger, view_name, and optional extra cols.
+        """
+        if self._combined_df is not None and not self._new_df_added:            
+            return self._combined_df
 
-    def get_unique_as_dict(self, col_label: List[str]):
-        '''
-        Make a nested dictionary of unique information - pandas merge optimized version
-        
-        PERFORMANCE OPTIMIZED: This method was completely rewritten to use pandas
-        merge operations instead of iterative filtering. Key improvements:
-        - Batch operations instead of row-by-row processing
-        - Single merge per display instead of multiple get_eq() calls  
-        - Pre-computed expanded combinations for sub-options
-        - Vectorized existence checks
-        
-        Expected speedup: 10-100x faster for large datasets
-        '''
-        unique_combos = self.get_unique_cols_all_db(col_label)
+        dfs = []
+        for view_name, opts in self._views.items():
+            df = self._displays[opts['display_name']].as_dataframe().copy()
+            df["view_name"] = view_name
 
-        if unique_combos.empty:
-            return {}
+            # ensure the extra col exists if defined
+            if opts["page_col_name"] is not None and opts["page_col_name"] not in df.columns:
+                raise KeyError(f"{opts['page_col_name']} not in dataframe {opts['display_name']}")
 
-        exists_data = []
+            dfs.append(df)
 
-        # Convert unique_combos to list of dicts for result building
-        combo_records = unique_combos.to_dict('records')
+        if not dfs:
+            self._combined_df = pd.DataFrame()
+        else:
+            self._combined_df = pd.concat(dfs, ignore_index=True)
 
-        # Pre-compute existence for all displays using pandas operations
-        display_existence = {}
-        
-        for display, opts in self._views.items():
-            display_name = opts['display_name']
-            extra_col = opts['page_col_name']
-            
-            if display_name not in self._displays:
-                continue
-                
-            df = self._displays[display_name].as_dataframe()
-            
-            if df.empty:
-                display_existence[display] = {}
-                continue
-            
-            if extra_col is None:
-                # Simple existence check using merge
-                merge_cols = [col for col in col_label if col in df.columns]
-                if merge_cols:
-                    merged = unique_combos[merge_cols].merge(
-                        df[merge_cols].drop_duplicates(), 
-                        on=merge_cols, 
-                        how='left', 
-                        indicator=True
-                    )
-                    # Create boolean series for existence
-                    exists_series = merged['_merge'] == 'both'
-                    display_existence[display] = dict(zip(
-                        range(len(unique_combos)), 
-                        exists_series.values
-                    ))
-                else:
-                    display_existence[display] = {i: False for i in range(len(unique_combos))}
-            else:
-                # Sub-option existence check
-                extra_col_vals = opts['page_col_indices']
-                display_existence[display] = {}
-                
-                merge_cols = [col for col in col_label + [extra_col] if col in df.columns]
-                if merge_cols and extra_col in df.columns:
-                    # Create all combinations of unique_combos with extra_col_vals
-                    expanded_combos = []
-                    combo_indices = []
-                    
-                    for i, combo in enumerate(combo_records):
-                        for sub_val in extra_col_vals:
-                            expanded_combo = combo.copy()
-                            expanded_combo[extra_col] = sub_val
-                            expanded_combos.append(expanded_combo)
-                            combo_indices.append((i, sub_val))
-                    
-                    if expanded_combos:
-                        expanded_df = pd.DataFrame(expanded_combos)
-                        merged = expanded_df.merge(
-                            df[merge_cols].drop_duplicates(),
-                            on=merge_cols,
-                            how='left',
-                            indicator=True
-                        )
-                        
-                        # Group results back by original combo index
-                        for idx, (combo_idx, sub_val) in enumerate(combo_indices):
-                            if combo_idx not in display_existence[display]:
-                                display_existence[display][combo_idx] = {}
-                            display_existence[display][combo_idx][sub_val] = merged.iloc[idx]['_merge'] == 'both'
-                    else:
-                        display_existence[display] = {
-                            i: {sub_val: False for sub_val in extra_col_vals}
-                            for i in range(len(unique_combos))
-                        }
-                else:
-                    display_existence[display] = {
-                        i: {sub_val: False for sub_val in extra_col_vals}
-                        for i in range(len(unique_combos))
-                    }
+        self._combined_df = self._combined_df.loc[:,~self._combined_df.columns.duplicated()].copy()
 
-        # Build final result
-        for i, combo_dict in enumerate(combo_records):
-            entry = combo_dict.copy()
-            exists_dict = {}
-            
-            for display in self._views.keys():
-                if display in display_existence:
-                    exists_dict[display] = display_existence[display].get(i, False)
-                else:
-                    exists_dict[display] = False
-            
-            entry['exists'] = exists_dict
-            exists_data.append(entry)
+        self._new_df_added = False
+        self._existing_combos = None  # invalidate dependent cache
+    
+        return self._combined_df
+    
+    
 
-        return nested_group(exists_data, col_label)
+    def get_existing_combos(self) -> pd.DataFrame:
+        """
+        Precompute all (run, trigger, view_name, [extra cols]) that actually exist.
+        """
+        if self._existing_combos is not None and not self._new_df_added:
+            return self._existing_combos
+
+        combined = self.get_combined_dataframe()
+        if combined.empty:
+            self._existing_combos = pd.DataFrame()
+            return self._existing_combos
+
+        keep_cols = ["run", "trigger", "view_name"]
+
+        for opts in self._views.values():
+            if opts["page_col_name"] is not None and opts["page_col_name"] not in keep_cols:
+                keep_cols.append(opts["page_col_name"])
+
+        self._existing_combos = combined[keep_cols].drop_duplicates()
+        return self._existing_combos
+
