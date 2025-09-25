@@ -7,15 +7,15 @@
     <div class="col-md-12">
       {% if run and trigger %}
         {% if plane %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ ele }} Plane {{ plane }}</h1>
+          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ element_id }} Plane {{ plane }}</h1>
         {% else %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ ele }}</h1>
+          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ element_id }}</h1>
         {% endif %}
       {% else %}
         {% if plane %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ ele }} Plane {{ plane }}</h1>
+          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ element_id }} Plane {{ plane }}</h1>
         {% else %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ ele }}</h1>
+          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ element_id }}</h1>
         {% endif %}
       {% endif %}
     </div>

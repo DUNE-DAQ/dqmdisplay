@@ -1,170 +1,235 @@
 {% extends "base.html" %}
 
-{% block title %}Plot Navigator{% endblock %}
-
 {% block content %}
 <div class="container-fluid">
-    <h1 class="mb-4">Plot Navigator</h1>
-
-    {% macro link_item(url, icon, label) %}
-    <li><a href="{{ url }}" class="text-decoration-none"><i class="fas {{ icon }}"></i> {{ label }}</a></li>
-    {% endmacro %}
-
-    {% macro trigger_section(run, trigger, availability) %}
     <div class="row">
-        <!-- Event Displays -->
-        <div class="col-md-4">
-            <h6 class="text-primary">Event Displays</h6>
-            <ul class="list-unstyled ml-3">
-                {% for ele_no in [1,2,3,4,5] %}
-                    {% if availability.event_display[ele_no] %}
-                        {{ link_item(url_for('run_trigger_event_display', run=run, trigger=trigger, ele=ele_no), 'fa-chart-line', 'APA/CRP ' ~ ele_no ~ ' Display') }}
-                        {{ link_item(url_for('run_trigger_event_display_grid', run=run, trigger=trigger, ele=ele_no), 'fa-th', 'APA/CRP ' ~ ele_no ~ ' Grid') }}
-                    {% endif %}
-                {% endfor %}
-                {% for plane_no in [0,1,2] %}
-                    {% if availability.plane_display[plane_no] %}
-                        {{ link_item(url_for('run_trigger_event_display_plane', run=run, trigger=trigger, plane=plane_no), 'fa-layer-group', 'Plane ' ~ plane_no ~ ' Grid') }}
-                    {% endif %}
-                {% endfor %}
-            </ul>
-        </div>
+        <div class="col-12">
+            <h2 class="mb-4">Plot Navigator</h2>
+            <p class="text-muted mb-4">
+                Browse available plots organized by run and trigger. Click on run numbers to expand and see available triggers,
+                then click on trigger numbers to see available plots grouped by display.
+            </p>
 
-        <!-- Test Results -->
-        <div class="col-md-4">
-            <h6 class="text-success">Test Results</h6>
-            <ul class="list-unstyled ml-3">
-                {% if availability.wib_tests %}
-                    {{ link_item(url_for('run_trigger_tests_wibs', run=run, trigger=trigger), 'fa-vial', 'TPC WIB Test Results') }}
-                {% endif %}
-            </ul>
-        </div>
+            <!-- Runs per page dropdown -->
+            <div class="mb-3">
+                <label for="pageSizeSelect">Runs per page:</label>
+                <select id="pageSizeSelect" class="form-control form-control-sm" style="width: 100px;">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
 
-        <!-- PDS Plots -->
-        <div class="col-md-4">
-            <h6 class="text-warning">PDS Plots</h6>
-            <ul class="list-unstyled ml-3">
-                {% if availability.pds %}
-                    {{ link_item(url_for('run_trigger_pds', run=run, trigger=trigger), 'fa-chart-area', 'PDS Plots') }}
-                {% endif %}
-            </ul>
-        </div>
-    </div>
-    {% endmacro %}
+            <!-- Search box -->
+            <div class="mb-3">
+                <input type="text" id="runSearchInput" class="form-control form-control-sm" placeholder="Search runs...">
+            </div>
 
-    {% macro trigger_card(run, trigger, availability) %}
-    <div class="card trigger-card mb-3">
-        <div class="card-header" id="triggerHeading{{ run }}{{ trigger }}">
-            <h5 class="mb-0">
-                <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
-                    data-target="#triggerCollapse{{ run }}{{ trigger }}" aria-expanded="false"
-                    aria-controls="triggerCollapse{{ run }}{{ trigger }}">
-                    <i class="fas fa-caret-right" id="iconTrigger{{ run }}{{ trigger }}"></i>
-                    Trigger {{ trigger }}
-                </button>
-            </h5>
-        </div>
-        <div id="triggerCollapse{{ run }}{{ trigger }}" class="collapse" 
-            aria-labelledby="triggerHeading{{ run }}{{ trigger }}" data-parent="#triggerAccordion{{ run }}">
-            <div class="card-body">
-                {{ trigger_section(run, trigger, availability) }}
+            <!-- Runs accordion -->
+            <div id="runAccordion" class="accordion"></div>
+
+            <!-- Pagination block -->
+            <div class="d-flex justify-content-center mt-3 mb-4">
+                <button class="btn btn-primary btn-sm mr-2" id="firstPageBtn">First</button>
+                <button class="btn btn-primary btn-sm mr-2" id="prevPageBtn">Prev</button>
+                <span class="align-self-center mx-2" id="pageInfo"></span>
+                <button class="btn btn-primary btn-sm ml-2" id="nextPageBtn">Next</button>
+                <button class="btn btn-primary btn-sm ml-2" id="lastPageBtn">Last</button>
             </div>
         </div>
     </div>
-    {% endmacro %}
-
-    {% macro run_card(run, triggers) %}
-    <div class="card mb-3">
-        <div class="card-header" id="heading{{ run }}">
-            <h2 class="mb-0">
-                <button class="btn btn-link btn-block text-left" type="button" data-toggle="collapse"
-                    data-target="#collapse{{ run }}" aria-expanded="false" aria-controls="collapse{{ run }}">
-                    <i class="fas fa-chevron-right" id="iconRun{{ run }}"></i>
-                    Run {{ run }} ({{ triggers|length }} triggers)
-                </button>
-            </h2>
-        </div>
-        <div id="collapse{{ run }}" class="collapse" aria-labelledby="heading{{ run }}" data-parent="#runAccordion">
-            <div class="card-body">
-                <div class="accordion" id="triggerAccordion{{ run }}">
-                    {% for trigger, availability in triggers.items() %}
-                        {{ trigger_card(run, trigger, availability) }}
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endmacro %}
-
-    {% if run_trigger_data %}
-    <div class="accordion" id="runAccordion">
-        {% for run, triggers in run_trigger_data.items() %}
-            {{ run_card(run, triggers) }}
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="alert alert-warning" role="alert">
-        <h4 class="alert-heading">No Data Available</h4>
-        <p>No run/trigger combinations found in the data directories.</p>
-        <hr>
-        <p class="mb-0">Please check if the data directories contain files and the file patterns are correct.</p>
-    </div>
-    {% endif %}
 </div>
+
 <style>
-/* Run card */
-.card { 
-    margin-bottom: 1rem; 
+.card-body {
+    padding: 0.5rem;
 }
-
-/* Trigger card styling (nested under Runs) */
-.trigger-card .card-header { 
-    background-color: #e9f2ff;  /* light blue for triggers */
-    border-bottom: 1px solid #cce0ff;
+.row > .col {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
 }
-
-/* Buttons & chevrons */
-.btn-link { text-decoration:none; color:#495057; font-weight:500; }
-.btn-link:hover { color:#007bff; }
-.list-unstyled li { margin-bottom:5px; }
-.list-unstyled li a { color:#6c757d; padding:2px 5px; border-radius:3px; transition:0.2s; }
-.list-unstyled li a:hover { background:#e9ecef; color:#495057; }
-
-/* Chevron rotation */
-.fas { transition: transform 0.3s ease; }
-
-/* Optional: subtle card body background for triggers */
-.trigger-card .card-body {
-    background-color: #f0f8ff;  /* very light blue */
-    border-radius: 0 0 5px 5px;
+.fas.fa-chevron-right {
+    transition: transform 0.2s ease-in-out;
+}
+button[aria-expanded="true"] .fas.fa-chevron-right {
+    transform: rotate(90deg);
 }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Run chevrons
-    document.querySelectorAll('[id^="collapse"]').forEach(c => {
-        c.addEventListener('shown.bs.collapse', () => {
-            const icon = document.getElementById('iconRun' + c.id.replace('collapse',''));
-            if(icon) icon.style.transform = 'rotate(90deg)';
-        });
-        c.addEventListener('hidden.bs.collapse', () => {
-            const icon = document.getElementById('iconRun' + c.id.replace('collapse',''));
-            if(icon) icon.style.transform = 'rotate(0deg)';
-        });
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    let allRuns = [];
+    let filteredRuns = [];
+    let currentPage = 0;
+    let pageSize = parseInt(document.getElementById('pageSizeSelect').value);
 
-    // Trigger chevrons
-    document.querySelectorAll('[id^="triggerCollapse"]').forEach(c => {
-        c.addEventListener('shown.bs.collapse', () => {
-            const icon = document.getElementById('iconTrigger' + c.id.replace('triggerCollapse',''));
-            if(icon) icon.style.transform = 'rotate(90deg)';
+    const runAccordion = document.getElementById('runAccordion');
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    const runSearchInput = document.getElementById('runSearchInput');
+    const firstBtn = document.getElementById('firstPageBtn');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    const lastBtn = document.getElementById('lastPageBtn');
+    const pageInfo = document.getElementById('pageInfo');
+
+    pageSizeSelect.addEventListener('change', () => { pageSize = parseInt(pageSizeSelect.value); currentPage = 0; renderPage(); });
+    runSearchInput.addEventListener('input', () => { currentPage = 0; filterRuns(); });
+
+    firstBtn.addEventListener('click', () => { currentPage = 0; renderPage(); });
+    prevBtn.addEventListener('click', () => { if(currentPage>0) currentPage--; renderPage(); });
+    nextBtn.addEventListener('click', () => { if((currentPage+1)*pageSize < filteredRuns.length) currentPage++; renderPage(); });
+    lastBtn.addEventListener('click', () => { currentPage = Math.floor((filteredRuns.length-1)/pageSize); renderPage(); });
+
+    // Load runs
+    fetch("{{ url_for('plot_navigator_runs') }}")
+        .then(res => res.json())
+        .then(data => {
+            allRuns = data.runs;
+            filteredRuns = allRuns.slice();
+            renderPage();
         });
-        c.addEventListener('hidden.bs.collapse', () => {
-            const icon = document.getElementById('iconTrigger' + c.id.replace('triggerCollapse',''));
-            if(icon) icon.style.transform = 'rotate(0deg)';
+
+    function filterRuns() {
+        const searchVal = runSearchInput.value.trim();
+        if (searchVal === "") {
+            filteredRuns = allRuns.slice();
+        } else {
+            filteredRuns = allRuns.filter(r => r.toString().includes(searchVal));
+        }
+        renderPage();
+    }
+
+    function renderPage() {
+        runAccordion.innerHTML = "";
+        const start = currentPage * pageSize;
+        const end = Math.min(start + pageSize, filteredRuns.length);
+        const runsToDisplay = filteredRuns.slice(start, end);
+
+        pageInfo.textContent = `Page ${currentPage+1} of ${Math.ceil(filteredRuns.length/pageSize)}`;
+
+        // Preload triggers for all runs on page
+        runsToDisplay.forEach(run => {
+            const runCard = document.createElement('div');
+            runCard.className = "card mb-2";
+
+            const runHeader = document.createElement('div');
+            runHeader.className = "card-header";
+            runHeader.id = `runHeading${run}`;
+            runHeader.innerHTML = `
+                <h2 class="mb-0">
+                    <button class="btn btn-link collapsed" type="button" 
+                            data-toggle="collapse" data-target="#runCollapse${run}" 
+                            aria-expanded="false" aria-controls="runCollapse${run}">
+                        <i class="fas fa-chevron-right mr-2"></i>
+                        <strong>Run ${run}</strong>
+                    </button>
+                </h2>
+            `;
+
+            const runCollapse = document.createElement('div');
+            runCollapse.className = "collapse";
+            runCollapse.id = `runCollapse${run}`;
+            runCollapse.setAttribute("aria-labelledby", `runHeading${run}`);
+            runCollapse.setAttribute("data-parent", "#runAccordion");
+
+            const bodyDiv = document.createElement('div');
+            bodyDiv.className = "card-body";
+            bodyDiv.innerHTML = `<div class="accordion" id="triggerAccordion${run}"></div>`;
+
+            runCollapse.appendChild(bodyDiv);
+            runCard.appendChild(runHeader);
+            runCard.appendChild(runCollapse);
+            runAccordion.appendChild(runCard);
+
+            // Fetch triggers immediately
+            const triggerAccordion = document.getElementById(`triggerAccordion${run}`);
+            fetch(`{{ url_for('plot_navigator_triggers', run=0) }}`.replace("0", run))
+                .then(res => res.json())
+                .then(triggersData => {
+                    // Add trigger count badge to run header
+                    const runHeaderBtn = runHeader.querySelector('button');
+                    const badgeSpan = document.createElement('span');
+                    badgeSpan.className = 'badge badge-info ml-2';
+                    badgeSpan.textContent = triggersData.num_triggers + ' trigger(s)';
+                    runHeaderBtn.appendChild(badgeSpan);
+
+                    triggersData.triggers.forEach(triggerObj => {
+                        const trigger = triggerObj.trigger;
+                        const plots = triggerObj.plots;
+                        const displayNames = triggerObj.display_names.join(', ');
+
+                        const triggerCard = document.createElement('div');
+                        triggerCard.className = "card mb-1";
+
+                        const triggerHeader = document.createElement('div');
+                        triggerHeader.className = "card-header py-2";
+                        triggerHeader.id = `triggerHeading${run}${trigger}`;
+                        triggerHeader.innerHTML = `
+                            <h5 class="mb-0">
+                                <button class="btn btn-link btn-sm collapsed" type="button"
+                                        data-toggle="collapse" data-target="#triggerCollapse${run}${trigger}"
+                                        aria-expanded="false" aria-controls="triggerCollapse${run}${trigger}">
+                                    <i class="fas fa-chevron-right mr-2" style="font-size:0.8em;"></i>
+                                    <strong>Trigger ${trigger}</strong>
+                                    <span class="badge badge-info badge-sm ml-2">${plots.length} plot(s)</span>
+                                    <span class="badge badge-secondary badge-sm ml-1">${displayNames}</span>
+                                </button>
+                            </h5>
+                        `;
+
+                        const triggerCollapse = document.createElement('div');
+                        triggerCollapse.className = "collapse";
+                        triggerCollapse.id = `triggerCollapse${run}${trigger}`;
+                        triggerCollapse.setAttribute("aria-labelledby", `triggerHeading${run}${trigger}`);
+                        triggerCollapse.setAttribute("data-parent", `#triggerAccordion${run}`);
+
+                        const triggerBody = document.createElement('div');
+                        triggerBody.className = "card-body py-2";
+
+                        // Group plots by display
+                        const displayGroups = {};
+                        plots.forEach(plot => {
+                            const dispName = plot.display_name.split(' ')[0];
+                            if (!displayGroups[dispName]) displayGroups[dispName] = [];
+                            displayGroups[dispName].push(plot);
+                        });
+
+                        const table = document.createElement('table');
+                        table.className = "table table-sm mb-0";
+
+                        const headerRow = document.createElement('tr');
+                        for (const disp in displayGroups) {
+                            const th = document.createElement('th');
+                            th.textContent = disp;
+                            headerRow.appendChild(th);
+                        }
+                        table.appendChild(headerRow);
+
+                        const maxRows = Math.max(...Object.values(displayGroups).map(a => a.length));
+                        for (let i=0; i<maxRows; i++) {
+                            const row = document.createElement('tr');
+                            for (const disp in displayGroups) {
+                                const td = document.createElement('td');
+                                if (displayGroups[disp][i]) {
+                                    const plot = displayGroups[disp][i];
+                                    td.innerHTML = `<a href="${plot.url}" class="btn btn-outline-primary btn-sm btn-block text-left">
+                                        <i class="fas fa-chart-line mr-1"></i>${plot.display_name}
+                                    </a>`;
+                                }
+                                row.appendChild(td);
+                            }
+                            table.appendChild(row);
+                        }
+
+                        triggerBody.appendChild(table);
+                        triggerCollapse.appendChild(triggerBody);
+                        triggerCard.appendChild(triggerHeader);
+                        triggerCard.appendChild(triggerCollapse);
+                        triggerAccordion.appendChild(triggerCard);
+                    });
+                });
         });
-    });
+    }
 });
 </script>
 {% endblock %}
