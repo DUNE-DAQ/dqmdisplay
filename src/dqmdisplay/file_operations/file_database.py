@@ -1,6 +1,7 @@
 '''
 HW: Organise files in folder into database
 '''
+import os
 import time
 import pandas as pd
 from typing import List, Optional, Pattern, Tuple, Dict, Any
@@ -123,6 +124,8 @@ class DQMImageDatabase(NavigableDataframe):
         self._subdir = Path(subdir)
         self._regex = regex
         self._additional_elements = additional_elements
+        self._last_dir_mtime: float = 0.0
+        self._last_file_mtime: float = 0.0
 
         self._search_terms = ['run', 'trigger']
         search_dict = self.__build_dataframe(directory, subdir, regex, additional_elements)
@@ -148,9 +151,18 @@ class DQMImageDatabase(NavigableDataframe):
         search_dict = {n : [] for n in self._search_terms}
         search_dict[self._name] = []
 
-        # Check for matches with regex
-        for f in search_path.iterdir():
-            self.__build_search_dict(search_dict, f, regex_search_str)
+        max_mtime: float = 0.0
+        for entry in os.scandir(search_path):
+            try:
+                entry_mtime = entry.stat(follow_symlinks=False).st_mtime
+            except OSError:
+                continue
+            if entry_mtime > max_mtime:
+                max_mtime = entry_mtime
+            self.__build_search_dict(search_dict, Path(entry.path), regex_search_str)
+
+        self._last_file_mtime = max_mtime
+        self._last_dir_mtime = search_path.stat().st_mtime
 
         return pd.DataFrame.from_dict(search_dict)
 
@@ -177,13 +189,53 @@ class DQMImageDatabase(NavigableDataframe):
     def name(self):
         return self._name
 
-    def refresh(self):
-        '''Re-scan the directory and rebuild the DataFrame in-place.'''
-        self._search_terms = ['run', 'trigger']
-        new_df = self.__build_dataframe(
-            self._directory, self._subdir, self._regex, self._additional_elements
-        )
-        self._dataframe = new_df.sort_values(list(new_df.columns), ascending=False)
+    def refresh(self) -> bool:
+        '''Incrementally scan for files added since the last scan. Returns True if new rows were added.'''
+        search_path = self._directory / self._subdir
+        try:
+            dir_mtime = search_path.stat().st_mtime
+        except OSError:
+            return False
+
+        if dir_mtime == self._last_dir_mtime:
+            return False  # directory unchanged — skip scan entirely
+
+        all_cols = ['run', 'trigger'] + (self._additional_elements or [])
+        regex_search_str = re.compile(self._regex, re.X)
+        new_entries: Dict[str, list] = {n: [] for n in all_cols}
+        new_entries[self._name] = []
+        max_mtime = self._last_file_mtime
+
+        for entry in os.scandir(search_path):
+            try:
+                entry_mtime = entry.stat(follow_symlinks=False).st_mtime
+            except OSError:
+                continue
+            if entry_mtime > max_mtime:
+                max_mtime = entry_mtime
+            if entry_mtime <= self._last_file_mtime:
+                continue  # already known
+            match = regex_search_str.match(entry.name)
+            if not match:
+                continue
+            try:
+                row_vals = [int(match[s]) for s in all_cols]
+            except Exception:
+                continue
+            for s, v in zip(all_cols, row_vals):
+                new_entries[s].append(v)
+            new_entries[self._name].append(Path(entry.path))
+
+        self._last_dir_mtime = dir_mtime
+        self._last_file_mtime = max_mtime
+
+        if not new_entries[self._name]:
+            return False
+
+        new_df = pd.DataFrame.from_dict(new_entries)
+        self._dataframe = pd.concat([self._dataframe, new_df], ignore_index=True)
+        self._dataframe.sort_values(list(self._dataframe.columns), ascending=False, inplace=True)
+        return True
 
 class DQMImageDatabaseCollection :
     '''
@@ -198,6 +250,7 @@ class DQMImageDatabaseCollection :
 
         self._combined_df: Optional[pd.DataFrame] = None
         self._existing_combos: Optional[pd.DataFrame] = None
+        self._last_refresh: float = 0.0
 
 
     @property
@@ -300,18 +353,17 @@ class DQMImageDatabaseCollection :
 
 
     def refresh_all(self, min_interval_s: float = 30.0):
-        '''Re-scan all display directories if min_interval_s seconds have passed since the last refresh.'''
+        '''Check all display directories for new files, at most once per min_interval_s seconds.'''
         now = time.monotonic()
-        if hasattr(self, '_last_refresh') and (now - self._last_refresh) < min_interval_s:
+        if (now - self._last_refresh) < min_interval_s:
             return
-        for db in self._displays.values():
-            db.refresh()
         self._last_refresh = now
-        # Invalidate all caches
-        self._unique_combo_db = None
-        self._combined_df = None
-        self._existing_combos = None
-        self._new_df_added = True
+        changed = any(db.refresh() for db in self._displays.values())
+        if changed:
+            self._unique_combo_db = None
+            self._combined_df = None
+            self._existing_combos = None
+            self._new_df_added = True
 
     def get_unique_cols_all_db(self, col_labs: List[str]):
         # More efficient to cache this infomration

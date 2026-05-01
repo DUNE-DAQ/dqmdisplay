@@ -1,150 +1,94 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ProtoDUNE DQM</title>
-    <script>
-        // Refresh the page every 30 seconds
-        setInterval(function() {
-            window.location.reload();
-        }, 30000);
-    </script>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <script>
+        setInterval(function() { window.location.reload(); }, 30000);
+    </script>
     <style>
+        :root {
+            --navbar-height: 56px;
+        }
+
         body {
-            display: flex;
-            flex-direction: column;
-            margin: 0;
-            padding: 0;
+            padding-top: var(--navbar-height);
         }
 
-        /* Custom styles for the sidebar */
+        /* Navbar */
         .sidebar {
-            width: 100%;
-            position: fixed;
-            top: 0;
-            left: 0;
             background-color: #111;
-            padding: 10px 2%;
-            box-sizing: border-box;
-            z-index: 1050; /* Ensure it is above other content */
             border-bottom: 1px solid #333;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-            overflow: visible; /* Ensure overflow does not clip child elements */
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         }
 
-        /* Custom styles for navigation links */
         .sidebar .navbar-brand {
             font-weight: bold;
-            color: #ffffff;
+            color: #fff;
         }
 
         .sidebar .nav-link {
-            color: #ffffff !important;
+            color: #fff !important;
         }
 
         .sidebar .nav-link:hover {
-            color: #ddd !important;
+            color: #ccc !important;
         }
 
-        /* Dropdown menu positioning and sizing */
         .dropdown-menu {
-            position: absolute; /* Ensure dropdowns are positioned absolutely */
-            top: 100%; /* Position below the dropdown toggle */
-            left: 0; /* Align with the dropdown toggle */
             background-color: #343a40 !important;
             border: none;
-            z-index: 1100; /* Ensure dropdown menus are above the sidebar and content */
-            white-space: nowrap; /* Prevent dropdown items from wrapping */
-            min-width: 150px; /* Minimum width to fit the content comfortably */
-            width: auto; /* Adjust width based on content */
-            overflow: visible; /* Ensure dropdowns appear above content */
+            white-space: nowrap;
+            min-width: 180px;
         }
 
-	/* Style for the dropdown items */
         .dropdown-item {
-            color: #fff; /* Text color for the dropdown items */
-            background-color: #343a40 !important; /* Background color for the dropdown items */
-	    white-space: nowrap; /* Prevent wrapping of text */
+            color: #fff;
+            background-color: #343a40 !important;
         }
 
-        /* Optional: Style for the dropdown items when hovered */
         .dropdown-item:hover {
-            color: #fff; /* Text color when hovered */
-            background-color: #666 !important; /* Background color when hovered */
+            color: #fff;
+            background-color: #555 !important;
         }
 
-        /* Content margin to avoid overlap with fixed sidebar */
+        /* Content */
         .content {
-            margin-top: 80px; /* Adjust this value according to the actual height of the navbar */
-            padding: 20px;
+            padding: 16px;
         }
 
-        /* Responsive adjustments */
-        @media (max-width: 767px) {
-            .sidebar {
-                padding: 10px 0;
-            }
-            .content {
-                margin-top: 90px; /* Adjust margin-top if the navbar height changes */
-            }
-        }
-
-        .image-container {
-            text-align: center;
-	    margin-left: 2%;
-	    margin-right: 2%;
-	    margin-top: 1%;
-	    margin-bottom: 1%;
-        }
-
+        /* Images — base defaults */
         img {
-            width: 80%;
+            max-width: 100%;
             height: auto;
             display: block;
-            margin-left: auto;
-            margin-right: auto;
+            margin: auto;
         }
 
-        div > img {
-            padding: 2px;
-            width: calc(100% - 4px);
-            height: auto;
-            box-sizing: border-box;
+        /* Single-image display: wide but not edge-to-edge on large monitors */
+        .image-container {
+            text-align: center;
+            margin: 0.75% 1%;
         }
 
+        .image-container img {
+            width: 92%;
+            max-width: 1800px;
+        }
+
+        /* Grid images fill their Bootstrap column */
         .grid-image-container {
-            height: 99%;
-            width: 99%;
-            margin: 1%;
-            padding: 0%;
+            padding: 1px;
         }
 
-        /* Additional styling to ensure full width is used */
-        .grid-container, .image-container {
+        .grid-image-container img {
             width: 100%;
         }
 
-        /* Ensure images scale properly */
-        .grid-image-container img, .image-container img {
-            width: 100%;
-            height: auto;
-        }
-	.col-md-6 {
-            padding-left: 0;
-	    padding-right: 0;
-	    margin-left: 0;
-	    margin-right: 0;
-	}
-	/* Increase the gap between nav-items */
-	.sidebar .nav-item {
-	    margin-right: 15px; /* Adjust this value as needed for the spacing */
-	}
-
-	.sidebar .nav-item:last-child {
-	    margin-right: 0; /* Remove margin from the last item if you want to avoid extra space at the end */
-	}
-
-        /* Navigation button styles */
+        /* Prev / Next navigation buttons */
         .nav-buttons {
             position: fixed;
             bottom: 20px;
@@ -153,75 +97,73 @@
         }
 
         .nav-btn {
-            margin-left: 10px;
-            padding: 10px 15px;
+            display: inline-block;
+            margin-left: 8px;
+            padding: 10px 16px;
             background-color: #007bff;
-            color: white;
-            border: none;
+            color: #fff;
             border-radius: 5px;
             text-decoration: none;
-            transition: background-color 0.3s;
+            transition: background-color 0.2s;
         }
 
         .nav-btn:hover {
             background-color: #0056b3;
-            color: white;
+            color: #fff;
             text-decoration: none;
         }
 
-        .nav-btn:disabled {
-            background-color: #6c757d;
-            cursor: not-allowed;
-        }
-
         .nav-btn i {
-            margin-right: 5px;
+            margin-right: 4px;
         }
     </style>
 </head>
 <body>
 
-    <!-- Include Bootstrap CSS -->
-    <div class="sidebar navbar navbar-expand-lg navbar-dark bg-dark">
-        <a class="navbar-brand" href="{{ url_for('index') }}">Home</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+    <nav class="sidebar navbar navbar-expand-lg navbar-dark fixed-top">
+        <a class="navbar-brand" href="{{ url_for('index') }}">ProtoDUNE DQM</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown"
+                aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNavDropdown">
             <ul class="navbar-nav">
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownELE" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownELE" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         APA/CRP Displays
                     </a>
                     <div class="dropdown-menu" aria-labelledby="navbarDropdownELE">
                         {% for ele_no in [1,2,3,4,5] %}
-                        <a class="dropdown-item" href="{{ url_for('latest_event_display', element_id=ele_no) }}">APA/CRP {{ ele_no }} Displays</a>
+                        <a class="dropdown-item" href="{{ url_for('latest_event_display', element_id=ele_no) }}">APA/CRP {{ ele_no }}</a>
                         {% endfor %}
                     </div>
                 </li>
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownELEGrid" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        APA/CRP Grid Displays
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownELEGrid" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Grid Displays
                     </a>
                     <div class="dropdown-menu" aria-labelledby="navbarDropdownELEGrid">
                         {% for ele_no in [1,2,3,4,5] %}
-                        <a class="dropdown-item" href="{{ url_for('latest_event_display_grid', element_id=ele_no) }}">APA/CRP {{ ele_no }} Grid Display</a>
+                        <a class="dropdown-item" href="{{ url_for('latest_event_display_grid', element_id=ele_no) }}">APA/CRP {{ ele_no }}</a>
                         {% endfor %}
                     </div>
                 </li>
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownPlane" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        Plane Grid Displays
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownPlane" role="button"
+                       data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Plane Grids
                     </a>
                     <div class="dropdown-menu" aria-labelledby="navbarDropdownPlane">
                         {% for plane_no in [0,1,2] %}
-                        <a class="dropdown-item" href="{{ url_for('latest_event_display_plane', plane=plane_no) }}">Plane {{ plane_no }} Grid Display</a>
+                        <a class="dropdown-item" href="{{ url_for('latest_event_display_plane', plane=plane_no) }}">Plane {{ plane_no }}</a>
                         {% endfor %}
                     </div>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('latest_tests_wibs') }}">TPC WIB Test Results</a>
+                    <a class="nav-link" href="{{ url_for('latest_tests_wibs') }}">WIB Tests</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('latest_pds') }}">PDS Plots</a>
@@ -229,34 +171,31 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('plot_navigator') }}">Navigator</a>
                 </li>
-
             </ul>
         </div>
-    </div>
+    </nav>
 
-    <div class="content mt-5">
+    <div class="content">
         {% block content %}{% endblock %}
     </div>
 
-    <!-- Navigation buttons for pages that provide next/prev URLs -->
     {% if prev_url or next_url %}
     <div class="nav-buttons">
         {% if prev_url %}
-            <a href="{{ prev_url }}" class="nav-btn" title="Previous">
-                <i class="fas fa-chevron-left"></i>Previous
-            </a>
+        <a href="{{ prev_url }}" class="nav-btn">
+            <i class="fas fa-chevron-left"></i>Previous
+        </a>
         {% endif %}
         {% if next_url %}
-            <a href="{{ next_url }}" class="nav-btn" title="Next">
-                Next<i class="fas fa-chevron-right"></i>
-            </a>
+        <a href="{{ next_url }}" class="nav-btn">
+            Next<i class="fas fa-chevron-right ml-1"></i>
+        </a>
         {% endif %}
     </div>
     {% endif %}
 
-    <!-- Include Bootstrap JS and dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <!-- Font Awesome for icons -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+</body>
+</html>

@@ -13,9 +13,9 @@
     </div>
   </div>
 
-  <div class="row">
+  <div class="row no-gutters">
     {% for element_id in range(0, images|length) %}
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <div class="grid-image-container">
           <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=images[element_id]) }}" alt="alt"/>
         </div>
