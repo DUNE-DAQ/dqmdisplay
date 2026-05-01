@@ -1,6 +1,7 @@
 '''
 HW: Organise files in folder into database
 '''
+import time
 import pandas as pd
 from typing import List, Optional, Pattern, Tuple, Dict, Any
 import re
@@ -117,9 +118,13 @@ class DQMImageDatabase(NavigableDataframe):
         '''
         Build the database
         '''
-        self._search_terms = ['run', 'trigger']
         self._name = name
+        self._directory = Path(directory)
+        self._subdir = Path(subdir)
+        self._regex = regex
+        self._additional_elements = additional_elements
 
+        self._search_terms = ['run', 'trigger']
         search_dict = self.__build_dataframe(directory, subdir, regex, additional_elements)
         super().__init__(search_dict)
 
@@ -171,6 +176,14 @@ class DQMImageDatabase(NavigableDataframe):
     @property
     def name(self):
         return self._name
+
+    def refresh(self):
+        '''Re-scan the directory and rebuild the DataFrame in-place.'''
+        self._search_terms = ['run', 'trigger']
+        new_df = self.__build_dataframe(
+            self._directory, self._subdir, self._regex, self._additional_elements
+        )
+        self._dataframe = new_df.sort_values(list(new_df.columns), ascending=False)
 
 class DQMImageDatabaseCollection :
     '''
@@ -285,6 +298,20 @@ class DQMImageDatabaseCollection :
 
         return return_list
 
+
+    def refresh_all(self, min_interval_s: float = 30.0):
+        '''Re-scan all display directories if min_interval_s seconds have passed since the last refresh.'''
+        now = time.monotonic()
+        if hasattr(self, '_last_refresh') and (now - self._last_refresh) < min_interval_s:
+            return
+        for db in self._displays.values():
+            db.refresh()
+        self._last_refresh = now
+        # Invalidate all caches
+        self._unique_combo_db = None
+        self._combined_df = None
+        self._existing_combos = None
+        self._new_df_added = True
 
     def get_unique_cols_all_db(self, col_labs: List[str]):
         # More efficient to cache this infomration
