@@ -95,8 +95,8 @@ class NavigableDataframe:
         '''
         check_cols_in_db(self._dataframe, list(kwargs.keys()))
 
-        # Sort dataframe
-        self._dataframe.sort_values(merge_on+list(kwargs.keys()) , ascending=False, inplace=True)
+        # Atomic reassignment so the background scan thread never sees an in-place mutation
+        self._dataframe = self._dataframe.sort_values(merge_on+list(kwargs.keys()), ascending=False)
 
         cols = self.get_eq(**kwargs)
         if cols.empty:
@@ -233,8 +233,9 @@ class DQMImageDatabase(NavigableDataframe):
             return False
 
         new_df = pd.DataFrame.from_dict(new_entries)
-        self._dataframe = pd.concat([self._dataframe, new_df], ignore_index=True)
-        self._dataframe.sort_values(list(self._dataframe.columns), ascending=False, inplace=True)
+        combined = pd.concat([self._dataframe, new_df], ignore_index=True)
+        combined = combined.drop_duplicates(subset=[self._name], keep='last')
+        self._dataframe = combined.sort_values(list(combined.columns), ascending=False)
         return True
 
 class DQMImageDatabaseCollection :
@@ -250,7 +251,6 @@ class DQMImageDatabaseCollection :
 
         self._combined_df: Optional[pd.DataFrame] = None
         self._existing_combos: Optional[pd.DataFrame] = None
-        self._last_refresh: float = 0.0
 
 
     @property
@@ -352,14 +352,11 @@ class DQMImageDatabaseCollection :
         return return_list
 
 
-    def refresh_all(self, min_interval_s: float = 30.0):
-        '''Check all display directories for new files, at most once per min_interval_s seconds.'''
-        now = time.monotonic()
-        if (now - self._last_refresh) < min_interval_s:
-            return
-        self._last_refresh = now
-        changed = any(db.refresh() for db in self._displays.values())
-        if changed:
+    def refresh_all(self):
+        '''Check all display directories for new files and invalidate caches if anything changed.'''
+        # Evaluate ALL databases — don't short-circuit with any() on a generator
+        results = [db.refresh() for db in self._displays.values()]
+        if any(results):
             self._unique_combo_db = None
             self._combined_df = None
             self._existing_combos = None

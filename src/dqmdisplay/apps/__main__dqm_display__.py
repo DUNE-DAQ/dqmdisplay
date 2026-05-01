@@ -1,7 +1,10 @@
+import os
+import time
+import threading
 from pathlib import Path
 
 import click
-from flask import Flask, send_from_directory, render_template
+from flask import Flask, send_from_directory, render_template, make_response
 
 from dqmdisplay.file_operations.dqm_display import DQMDisplayApp
 
@@ -9,15 +12,16 @@ app = Flask(__name__)
 
 IMAGE_DIRECTORY = '/nfs/rscratch/np04daq'
 _dqm_app: DQMDisplayApp | None = None
-
-# How often (seconds) the server re-scans the image directory for new files.
 REFRESH_INTERVAL_S = 30
 
 
-@app.before_request
-def refresh_file_database():
-    if _dqm_app is not None:
-        _dqm_app.database_collection.refresh_all(min_interval_s=REFRESH_INTERVAL_S)
+def _scan_loop():
+    '''Background daemon: checks for new image files every REFRESH_INTERVAL_S seconds.
+    Runs completely independently of HTTP request handling — zero request latency impact.'''
+    while True:
+        time.sleep(REFRESH_INTERVAL_S)
+        if _dqm_app is not None:
+            _dqm_app.database_collection.refresh_all()
 
 
 @app.route('/')
@@ -32,7 +36,11 @@ def serve_image(subdir, filename):
     path = Path(IMAGE_DIRECTORY) / subdir / filename
     if not path.exists():
         raise RuntimeError(f"Couldn't make path to {path}")
-    return send_from_directory(IMAGE_DIRECTORY + "/" + subdir, filename)
+    resp = make_response(send_from_directory(IMAGE_DIRECTORY + '/' + subdir, filename))
+    # Images have unique names per run/trigger so caching is safe; avoids re-fetching
+    # unchanged images on every 30-second page reload.
+    resp.headers['Cache-Control'] = 'public, max-age=300'
+    return resp
 
 
 @click.command()
@@ -49,7 +57,15 @@ def main(image_dir, port, refresh_interval):
     _dqm_app = DQMDisplayApp(IMAGE_DIRECTORY)
     _dqm_app.link_app(app)
 
-    app.run(debug=True, host='0.0.0.0', port=port)
+    # Background scanner — daemon so it exits with the main process
+    scanner = threading.Thread(target=_scan_loop, daemon=True, name='file-scanner')
+    scanner.start()
+
+    # threaded=True: serve images concurrently while the HTML page loads
+    # use_reloader=False: prevents werkzeug from spawning a second process that
+    #   would also start a second background scanner thread
+    app.run(debug=True, host='0.0.0.0', port=port,
+            threaded=True, use_reloader=False)
 
 
 if __name__ == '__main__':

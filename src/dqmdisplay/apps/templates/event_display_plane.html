@@ -17,7 +17,7 @@
     {% for element_id in range(0, images|length) %}
       <div class="col-12 col-md-6">
         <div class="grid-image-container">
-          <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=images[element_id]) }}" alt="alt"/>
+          <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=images[element_id]) }}" alt="alt" loading="lazy"/>
         </div>
       </div>
     {% endfor %}

@@ -24,7 +24,7 @@
   {% for image in images %}
   <div class="row">
     <div class="image-container">
-      <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=image) }}" alt="{{ image }}"/>
+      <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=image) }}" alt="{{ image }}" loading="lazy"/>
     </div>
   </div>
   {% endfor %}
