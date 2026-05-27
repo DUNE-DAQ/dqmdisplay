@@ -1,18 +1,89 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="container-fluid">
 
-<div class="grid-container">
-
-  <div class="row">
-    <div class="col-md-12">
-
-      <h1>ProtoDUNE Online Data Quality Monitoring</h1>
-      (look at the top)
-
+  <div class="row mb-3">
+    <div class="col-12">
+      <h4 class="page-title">ProtoDUNE Online Data Quality Monitoring</h4>
+      <p class="text-muted">Select a view from the navigation bar, or jump directly to a section below.</p>
     </div>
   </div>
 
-</div>
+  <div class="row">
 
+    <div class="col-12 col-sm-6 col-lg-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-wave-square mr-2 text-primary"></i>APA/CRP Displays</h5>
+          <p class="card-text text-muted small">Latest per-APA/CRP event displays, one plane at a time.</p>
+          <div class="d-flex flex-wrap" style="gap: 4px;">
+            {% for ele_no in [1,2,3,4,5] %}
+            <a href="{{ url_for('latest_event_display', element_id=ele_no) }}" class="btn btn-outline-primary btn-sm">APA/CRP {{ ele_no }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-th mr-2 text-primary"></i>Grid Displays</h5>
+          <p class="card-text text-muted small">All planes for a given APA/CRP shown side by side.</p>
+          <div class="d-flex flex-wrap" style="gap: 4px;">
+            {% for ele_no in [1,2,3,4,5] %}
+            <a href="{{ url_for('latest_event_display_grid', element_id=ele_no) }}" class="btn btn-outline-primary btn-sm">APA/CRP {{ ele_no }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-layer-group mr-2 text-primary"></i>Plane Grids</h5>
+          <p class="card-text text-muted small">All APA/CRPs for a given plane shown side by side.</p>
+          <div class="d-flex flex-wrap" style="gap: 4px;">
+            {% for plane_no in [0,1,2] %}
+            <a href="{{ url_for('latest_event_display_plane', plane=plane_no) }}" class="btn btn-outline-primary btn-sm">Plane {{ plane_no }}</a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-bolt mr-2 text-warning"></i>WIB Tests</h5>
+          <p class="card-text text-muted small">Latest TPC WIB diagnostic test results.</p>
+          <a href="{{ url_for('latest_tests_wibs') }}" class="btn btn-outline-warning btn-sm">View latest</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-chart-line mr-2 text-success"></i>PDS Plots</h5>
+          <p class="card-text text-muted small">Latest photon detection system plots.</p>
+          <a href="{{ url_for('latest_pds') }}" class="btn btn-outline-success btn-sm">View latest</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-lg-4 mb-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-compass mr-2 text-secondary"></i>Navigator</h5>
+          <p class="card-text text-muted small">Browse all available plots by run and trigger number.</p>
+          <a href="{{ url_for('plot_navigator') }}" class="btn btn-outline-secondary btn-sm">Open navigator</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
 {% endblock %}
