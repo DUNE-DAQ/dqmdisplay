@@ -1,6 +1,8 @@
+import logging
 import os
 import time
 import threading
+import traceback
 from pathlib import Path
 
 import click
@@ -15,13 +17,22 @@ _dqm_app: DQMDisplayApp | None = None
 REFRESH_INTERVAL_S = 30
 
 
+_log = logging.getLogger('dqmdisplay.scanner')
+
+
 def _scan_loop():
     '''Background daemon: checks for new image files every REFRESH_INTERVAL_S seconds.
-    Runs completely independently of HTTP request handling — zero request latency impact.'''
+    Runs completely independently of HTTP request handling — zero request latency impact.
+    Exceptions are logged and swallowed so the thread never dies silently.'''
     while True:
         time.sleep(REFRESH_INTERVAL_S)
-        if _dqm_app is not None:
+        if _dqm_app is None:
+            continue
+        try:
             _dqm_app.database_collection.refresh_all()
+        except Exception:
+            _log.error('Unhandled exception in file-scanner thread — scan skipped:\n%s',
+                       traceback.format_exc())
 
 
 @app.route('/')
