@@ -2,7 +2,6 @@
 HW: Organise files in folder into database
 '''
 import os
-import time
 import pandas as pd
 from typing import List, Optional, Pattern, Tuple, Dict, Any
 import re
