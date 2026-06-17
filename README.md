@@ -10,7 +10,7 @@ cd <workarea>
 source env.sh
 
 # Clone dqmtools here
-git clone https://github.com/DUNE-DAQ/dqmdisplay.git
+git clone https://github.com/DUNE-DAQ/dqmtools.git
 cd dqmtools
 pip install [-e] .
 ```
