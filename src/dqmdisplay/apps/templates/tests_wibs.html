@@ -1,22 +1,24 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid-container">
+<div class="container-fluid">
 
   <div class="row">
-    <div class="col-md-12">
+    <div class="col-12">
       {% if run and trigger %}
-        <h1>ProtoDUNE DQM Tests: Run {{ run }}, Trigger {{ trigger }} – WIBs</h1>
+        <h4 class="page-title">Run {{ run }} &middot; Trigger {{ trigger }} &mdash; WIB Tests</h4>
       {% else %}
-        <h1>ProtoDUNE DQM Tests: Latest WIBs</h1>
+        <h4 class="page-title">Latest &mdash; WIB Tests</h4>
       {% endif %}
     </div>
   </div>
 
   {% for image in images %}
   <div class="row">
-    <div class="image-container">
-      <img src="{{ url_for('serve_image', subdir='WIBTests', filename=image) }}" alt="{{ image }}"/>
+    <div class="col-12">
+      <div class="image-container">
+        <img src="{{ url_for('serve_image', subdir='WIBTests', filename=image) }}" alt="{{ image }}" loading="lazy"/>
+      </div>
     </div>
   </div>
   {% endfor %}

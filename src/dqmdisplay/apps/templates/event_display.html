@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid-container">
+<div class="container-fluid">
 
   <div class="row">
-    <div class="col-md-12">
+    <div class="col-12">
       {% if run and trigger %}
         {% if plane %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ element_id }} Plane {{ plane }}</h1>
+          <h4 class="page-title">Run {{ run }} &middot; Trigger {{ trigger }} &middot; APA/CRP {{ element_id }} &middot; Plane {{ plane }}</h4>
         {% else %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, APA/CRP {{ element_id }}</h1>
+          <h4 class="page-title">Run {{ run }} &middot; Trigger {{ trigger }} &middot; APA/CRP {{ element_id }}</h4>
         {% endif %}
       {% else %}
         {% if plane %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ element_id }} Plane {{ plane }}</h1>
+          <h4 class="page-title">Latest &mdash; APA/CRP {{ element_id }}, Plane {{ plane }}</h4>
         {% else %}
-          <h1>ProtoDUNE EVENT DISPLAYS: Latest APA/CRP {{ element_id }}</h1>
+          <h4 class="page-title">Latest &mdash; APA/CRP {{ element_id }}</h4>
         {% endif %}
       {% endif %}
     </div>
@@ -23,8 +23,10 @@
 
   {% for image in images %}
   <div class="row">
-    <div class="image-container">
-      <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=image) }}" alt="{{ image }}"/>
+    <div class="col-12">
+      <div class="image-container">
+        <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=image) }}" alt="{{ image }}" loading="lazy"/>
+      </div>
     </div>
   </div>
   {% endfor %}

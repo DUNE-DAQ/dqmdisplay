@@ -10,31 +10,27 @@
                 then click on trigger numbers to see available plots grouped by display.
             </p>
 
-            <!-- Runs per page dropdown -->
-            <div class="mb-3">
-                <label for="pageSizeSelect">Runs per page:</label>
-                <select id="pageSizeSelect" class="form-control form-control-sm" style="width: 100px;">
+            <!-- Controls row -->
+            <div class="form-inline mb-3">
+                <label for="pageSizeSelect" class="mr-2">Runs per page:</label>
+                <select id="pageSizeSelect" class="form-control form-control-sm mr-3" style="width: auto;">
                     <option value="20">20</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
                 </select>
-            </div>
-
-            <!-- Search box -->
-            <div class="mb-3">
-                <input type="text" id="runSearchInput" class="form-control form-control-sm" placeholder="Search runs...">
+                <input type="text" id="runSearchInput" class="form-control form-control-sm flex-grow-1" placeholder="Search runs...">
             </div>
 
             <!-- Runs accordion -->
             <div id="runAccordion" class="accordion"></div>
 
             <!-- Pagination block -->
-            <div class="d-flex justify-content-center mt-3 mb-4">
-                <button class="btn btn-primary btn-sm mr-2" id="firstPageBtn">First</button>
-                <button class="btn btn-primary btn-sm mr-2" id="prevPageBtn">Prev</button>
-                <span class="align-self-center mx-2" id="pageInfo"></span>
-                <button class="btn btn-primary btn-sm ml-2" id="nextPageBtn">Next</button>
-                <button class="btn btn-primary btn-sm ml-2" id="lastPageBtn">Last</button>
+            <div class="d-flex flex-wrap justify-content-center align-items-center mt-3 mb-4" style="gap: 6px;">
+                <button class="btn btn-primary btn-sm" id="firstPageBtn">&#171; First</button>
+                <button class="btn btn-primary btn-sm" id="prevPageBtn">&#8249; Prev</button>
+                <span id="pageInfo" class="px-2"></span>
+                <button class="btn btn-primary btn-sm" id="nextPageBtn">Next &#8250;</button>
+                <button class="btn btn-primary btn-sm" id="lastPageBtn">Last &#187;</button>
             </div>
         </div>
     </div>

@@ -10,3 +10,6 @@ dependencies = [
 
 [project.scripts]
 dqm_display="dqmdisplay.apps.__main__dqm_display__:main"
+
+[tool.setuptools.package-data]
+"dqmdisplay" = ["apps/templates/*.html"]

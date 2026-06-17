@@ -1,27 +1,27 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid-container">
+<div class="container-fluid">
 
   <div class="row">
-    <div class="col-md-12">
+    <div class="col-12">
       {% if run and trigger %}
-        <h1>ProtoDUNE EVENT DISPLAYS: Run {{ run }}, Trigger {{ trigger }}, Plane {{ plane }} GRID</h1>
+        <h4 class="page-title">Run {{ run }} &middot; Trigger {{ trigger }} &middot; Plane {{ plane }} &mdash; Grid</h4>
       {% else %}
-        <h1>ProtoDUNE EVENT DISPLAYS: Latest Plane {{ plane }} GRID</h1>
+        <h4 class="page-title">Latest &mdash; Plane {{ plane }} Grid</h4>
       {% endif %}
     </div>
   </div>
 
-  <div class="row">
+  <div class="row no-gutters">
     {% for element_id in range(0, images|length) %}
-      <div class="col-md-6">
+      <div class="col-12 col-md-6">
         <div class="grid-image-container">
-          <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=images[element_id]) }}" alt="alt"/>
+          <img src="{{ url_for('serve_image', subdir='EventDisplays', filename=images[element_id]) }}" alt="APA/CRP {{ element_id }}" loading="lazy"/>
         </div>
       </div>
     {% endfor %}
   </div>
-  
+
 </div>
 {% endblock %}
