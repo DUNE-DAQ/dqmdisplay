@@ -199,7 +199,7 @@ class DQMImageDatabase(NavigableDataframe):
         if dir_mtime == self._last_dir_mtime:
             return False  # directory unchanged — skip scan entirely
 
-        all_cols = ['run', 'trigger'] + (self._additional_elements or [])
+        all_cols = self._search_terms
         regex_search_str = re.compile(self._regex, re.X)
         new_entries: Dict[str, list] = {n: [] for n in all_cols}
         new_entries[self._name] = []
@@ -212,8 +212,8 @@ class DQMImageDatabase(NavigableDataframe):
                 continue
             if entry_mtime > max_mtime:
                 max_mtime = entry_mtime
-            if entry_mtime <= self._last_file_mtime:
-                continue  # already known
+            if entry_mtime < self._last_file_mtime:
+                continue  # definitely older — skip
             match = regex_search_str.match(entry.name)
             if not match:
                 continue
